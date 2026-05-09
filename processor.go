@@ -78,6 +78,9 @@ type processor struct {
 	// dlqManager routes permanently failed tasks to the Dead Letter Queue.
 	dlqManager   *dlqManager
 	dlqThreshold int
+
+	// visibilityTracker tracks per-task visibility for crash recovery.
+	visibilityTracker *VisibilityTracker
 }
 
 type processorParams struct {
@@ -98,6 +101,7 @@ type processorParams struct {
 	finished          chan<- *base.TaskMessage
 	redisClient       redis.UniversalClient
 	dlqThreshold      int
+	visibilityTimeout time.Duration
 }
 
 // newProcessor constructs a new processor.
@@ -109,9 +113,11 @@ func newProcessor(params processorParams) *processor {
 	}
 	var idemChecker *IdempotencyChecker
 	var dlqMgr *dlqManager
+	var visTrk *VisibilityTracker
 	if params.redisClient != nil {
 		idemChecker = NewIdempotencyChecker(params.redisClient)
 		dlqMgr = newDLQManager(params.redisClient)
+		visTrk = NewVisibilityTracker(params.redisClient, params.visibilityTimeout)
 	}
 	dlqThreshold := params.dlqThreshold
 	if dlqThreshold <= 0 {
@@ -142,6 +148,7 @@ func newProcessor(params processorParams) *processor {
 		idempotencyChecker: idemChecker,
 		dlqManager:         dlqMgr,
 		dlqThreshold:       dlqThreshold,
+		visibilityTracker:  visTrk,
 	}
 }
 
@@ -224,6 +231,14 @@ func (p *processor) exec() {
 				p.finished <- msg
 				<-p.sema // release token
 			}()
+
+			// Feature 3: Visibility timeout — claim task and start heartbeat renewal.
+			if p.visibilityTracker != nil {
+				if err := p.visibilityTracker.Claim(msg.ID); err != nil {
+					p.logger.Warnf("visibility: failed to claim task id=%s: %v", msg.ID, err)
+				}
+				defer p.visibilityTracker.Release(msg.ID)
+			}
 
 			ctx, cancel := asynqcontext.New(p.baseCtxFn(), msg, deadline)
 			p.cancelations.Add(msg.ID, cancel)

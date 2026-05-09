@@ -260,6 +260,13 @@ type Config struct {
 	//
 	// If unset or zero, defaults to 3.
 	DLQThreshold int
+
+	// VisibilityTimeout specifies how long a worker has to process a task before
+	// the task is considered orphaned (worker crashed) and recovered by the Recoverer.
+	// The worker must renew its claim every VisibilityTimeout/3 seconds (automatically).
+	//
+	// If unset or zero, defaults to 30 seconds.
+	VisibilityTimeout time.Duration
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -567,6 +574,7 @@ func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server {
 		finished:          finished,
 		redisClient:       c,
 		dlqThreshold:      cfg.DLQThreshold,
+		visibilityTimeout: cfg.VisibilityTimeout,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,

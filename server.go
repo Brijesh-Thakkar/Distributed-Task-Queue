@@ -252,6 +252,14 @@ type Config struct {
 	// If unset or zero, default batch size of 100 is used.
 	// Make sure to not put a big number as the batch size to prevent a long-running script.
 	JanitorBatchSize int
+
+	// DLQThreshold specifies the number of retries after which a permanently failed task
+	// is routed to the Dead Letter Queue (DLQ) instead of the normal archive.
+	//
+	// DLQ tasks can be inspected and requeued via the DLQHTTPHandler.
+	//
+	// If unset or zero, defaults to 3.
+	DLQThreshold int
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -558,6 +566,7 @@ func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server {
 		starting:          starting,
 		finished:          finished,
 		redisClient:       c,
+		dlqThreshold:      cfg.DLQThreshold,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,

@@ -74,6 +74,10 @@ type processor struct {
 
 	// idempotencyChecker handles exactly-once processing checks via Redis Lua scripts.
 	idempotencyChecker *IdempotencyChecker
+
+	// dlqManager routes permanently failed tasks to the Dead Letter Queue.
+	dlqManager   *dlqManager
+	dlqThreshold int
 }
 
 type processorParams struct {
@@ -93,6 +97,7 @@ type processorParams struct {
 	starting          chan<- *workerInfo
 	finished          chan<- *base.TaskMessage
 	redisClient       redis.UniversalClient
+	dlqThreshold      int
 }
 
 // newProcessor constructs a new processor.
@@ -103,8 +108,14 @@ func newProcessor(params processorParams) *processor {
 		orderedQueues = sortByPriority(queues)
 	}
 	var idemChecker *IdempotencyChecker
+	var dlqMgr *dlqManager
 	if params.redisClient != nil {
 		idemChecker = NewIdempotencyChecker(params.redisClient)
+		dlqMgr = newDLQManager(params.redisClient)
+	}
+	dlqThreshold := params.dlqThreshold
+	if dlqThreshold <= 0 {
+		dlqThreshold = defaultDLQThreshold
 	}
 	return &processor{
 		logger:             params.logger,
@@ -129,6 +140,8 @@ func newProcessor(params processorParams) *processor {
 		starting:           params.starting,
 		finished:           params.finished,
 		idempotencyChecker: idemChecker,
+		dlqManager:         dlqMgr,
+		dlqThreshold:       dlqThreshold,
 	}
 }
 
@@ -367,7 +380,19 @@ func (p *processor) handleFailedMessage(ctx context.Context, l *base.Lease, msg 
 		p.markAsDone(l, msg)
 	case msg.Retried >= msg.Retry || errors.Is(err, SkipRetry):
 		p.logger.Warnf("Retry exhausted for task id=%s", msg.ID)
-		p.archive(l, msg, err)
+		// Feature 2: DLQ routing — send to DLQ instead of archive when threshold exceeded.
+		if p.dlqManager != nil && msg.Retried >= p.dlqThreshold {
+			p.logger.Infof("Routing task id=%s to DLQ (retried=%d >= dlqThreshold=%d)", msg.ID, msg.Retried, p.dlqThreshold)
+			if dlqErr := p.dlqManager.sendToDLQ(context.Background(), msg.Queue, msg); dlqErr != nil {
+				p.logger.Warnf("Failed to send task id=%s to DLQ: %v; falling back to archive", msg.ID, dlqErr)
+				p.archive(l, msg, err)
+			} else {
+				// Successfully sent to DLQ — still need to remove from active.
+				p.markAsDone(l, msg)
+			}
+		} else {
+			p.archive(l, msg, err)
+		}
 	default:
 		p.retry(l, msg, err, p.isFailureFunc(err))
 	}

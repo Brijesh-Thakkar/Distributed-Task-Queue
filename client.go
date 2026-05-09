@@ -60,6 +60,7 @@ const (
 	TaskIDOpt
 	RetentionOpt
 	GroupOpt
+	IdempotencyKeyOpt
 )
 
 // Option specifies the task processing behavior.
@@ -76,16 +77,20 @@ type Option interface {
 
 // Internal option representations.
 type (
-	retryOption     int
-	queueOption     string
-	taskIDOption    string
-	timeoutOption   time.Duration
-	deadlineOption  time.Time
-	uniqueOption    time.Duration
-	processAtOption time.Time
-	processInOption time.Duration
-	retentionOption time.Duration
-	groupOption     string
+	retryOption         int
+	queueOption         string
+	taskIDOption        string
+	timeoutOption       time.Duration
+	deadlineOption      time.Time
+	uniqueOption        time.Duration
+	processAtOption     time.Time
+	processInOption     time.Duration
+	retentionOption     time.Duration
+	groupOption         string
+	idempotencyKeyOption struct {
+		key string
+		ttl time.Duration
+	}
 )
 
 // MaxRetry returns an option to specify the max number of times
@@ -217,6 +222,24 @@ func (name groupOption) String() string     { return fmt.Sprintf("Group(%q)", st
 func (name groupOption) Type() OptionType   { return GroupOpt }
 func (name groupOption) Value() interface{} { return string(name) }
 
+// IdempotencyKey returns an option to specify an idempotency key for exactly-once processing.
+// If a task with the same key has already been processed within the given TTL,
+// the task will be skipped and marked as completed without calling the handler.
+// This prevents duplicate task execution during network retries.
+//
+// The key should be a unique identifier for the logical operation (e.g. "payment-charge-order-123").
+// TTL specifies how long the idempotency key is retained. Default is 24 hours.
+func IdempotencyKey(key string, ttl time.Duration) Option {
+	if ttl <= 0 {
+		ttl = defaultIdempotencyTTL
+	}
+	return idempotencyKeyOption{key: key, ttl: ttl}
+}
+
+func (o idempotencyKeyOption) String() string     { return fmt.Sprintf("IdempotencyKey(%q, %v)", o.key, o.ttl) }
+func (o idempotencyKeyOption) Type() OptionType   { return IdempotencyKeyOpt }
+func (o idempotencyKeyOption) Value() interface{} { return o }
+
 // ErrDuplicateTask indicates that the given task could not be enqueued since it's a duplicate of another task.
 //
 // ErrDuplicateTask error only applies to tasks enqueued with a Unique option.
@@ -228,15 +251,17 @@ var ErrDuplicateTask = errors.New("task already exists")
 var ErrTaskIDConflict = errors.New("task ID conflicts with another task")
 
 type option struct {
-	retry     int
-	queue     string
-	taskID    string
-	timeout   time.Duration
-	deadline  time.Time
-	uniqueTTL time.Duration
-	processAt time.Time
-	retention time.Duration
-	group     string
+	retry           int
+	queue           string
+	taskID          string
+	timeout         time.Duration
+	deadline        time.Time
+	uniqueTTL       time.Duration
+	processAt       time.Time
+	retention       time.Duration
+	group           string
+	idempotencyKey  string
+	idempotencyTTL  time.Duration
 }
 
 // composeOptions merges user provided options into the default options
@@ -290,6 +315,12 @@ func composeOptions(opts ...Option) (option, error) {
 				return option{}, errors.New("group key cannot be empty")
 			}
 			res.group = key
+		case idempotencyKeyOption:
+			if isBlank(opt.key) {
+				return option{}, errors.New("idempotency key cannot be empty")
+			}
+			res.idempotencyKey = opt.key
+			res.idempotencyTTL = opt.ttl
 		default:
 			// ignore unexpected option
 		}
@@ -382,17 +413,19 @@ func (c *Client) EnqueueContext(ctx context.Context, task *Task, opts ...Option)
 		uniqueKey = base.UniqueKey(opt.queue, task.Type(), task.Payload())
 	}
 	msg := &base.TaskMessage{
-		ID:        opt.taskID,
-		Type:      task.Type(),
-		Payload:   task.Payload(),
-		Headers:   task.Headers(),
-		Queue:     opt.queue,
-		Retry:     opt.retry,
-		Deadline:  deadline.Unix(),
-		Timeout:   int64(timeout.Seconds()),
-		UniqueKey: uniqueKey,
-		GroupKey:  opt.group,
-		Retention: int64(opt.retention.Seconds()),
+		ID:              opt.taskID,
+		Type:            task.Type(),
+		Payload:         task.Payload(),
+		Headers:         task.Headers(),
+		Queue:           opt.queue,
+		Retry:           opt.retry,
+		Deadline:        deadline.Unix(),
+		Timeout:         int64(timeout.Seconds()),
+		UniqueKey:       uniqueKey,
+		GroupKey:        opt.group,
+		Retention:       int64(opt.retention.Seconds()),
+		IdempotencyKey:  opt.idempotencyKey,
+		IdempotencyTTL:  int64(opt.idempotencyTTL.Seconds()),
 	}
 	now := time.Now()
 	var state base.TaskState

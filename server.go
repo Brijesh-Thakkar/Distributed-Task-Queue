@@ -557,6 +557,7 @@ func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server {
 		shutdownTimeout:   shutdownTimeout,
 		starting:          starting,
 		finished:          finished,
+		redisClient:       c,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,

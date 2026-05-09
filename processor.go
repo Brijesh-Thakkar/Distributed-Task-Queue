@@ -21,6 +21,7 @@ import (
 	"github.com/hibiken/asynq/internal/errors"
 	"github.com/hibiken/asynq/internal/log"
 	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 )
 
@@ -70,6 +71,9 @@ type processor struct {
 
 	starting chan<- *workerInfo
 	finished chan<- *base.TaskMessage
+
+	// idempotencyChecker handles exactly-once processing checks via Redis Lua scripts.
+	idempotencyChecker *IdempotencyChecker
 }
 
 type processorParams struct {
@@ -88,6 +92,7 @@ type processorParams struct {
 	shutdownTimeout   time.Duration
 	starting          chan<- *workerInfo
 	finished          chan<- *base.TaskMessage
+	redisClient       redis.UniversalClient
 }
 
 // newProcessor constructs a new processor.
@@ -97,28 +102,33 @@ func newProcessor(params processorParams) *processor {
 	if params.strictPriority {
 		orderedQueues = sortByPriority(queues)
 	}
+	var idemChecker *IdempotencyChecker
+	if params.redisClient != nil {
+		idemChecker = NewIdempotencyChecker(params.redisClient)
+	}
 	return &processor{
-		logger:            params.logger,
-		broker:            params.broker,
-		baseCtxFn:         params.baseCtxFn,
-		clock:             timeutil.NewRealClock(),
-		queueConfig:       queues,
-		orderedQueues:     orderedQueues,
-		taskCheckInterval: params.taskCheckInterval,
-		retryDelayFunc:    params.retryDelayFunc,
-		isFailureFunc:     params.isFailureFunc,
-		syncRequestCh:     params.syncCh,
-		cancelations:      params.cancelations,
-		errLogLimiter:     rate.NewLimiter(rate.Every(3*time.Second), 1),
-		sema:              make(chan struct{}, params.concurrency),
-		done:              make(chan struct{}),
-		quit:              make(chan struct{}),
-		abort:             make(chan struct{}),
-		errHandler:        params.errHandler,
-		handler:           HandlerFunc(func(ctx context.Context, t *Task) error { return fmt.Errorf("handler not set") }),
-		shutdownTimeout:   params.shutdownTimeout,
-		starting:          params.starting,
-		finished:          params.finished,
+		logger:             params.logger,
+		broker:             params.broker,
+		baseCtxFn:          params.baseCtxFn,
+		clock:              timeutil.NewRealClock(),
+		queueConfig:        queues,
+		orderedQueues:      orderedQueues,
+		taskCheckInterval:  params.taskCheckInterval,
+		retryDelayFunc:     params.retryDelayFunc,
+		isFailureFunc:      params.isFailureFunc,
+		syncRequestCh:      params.syncCh,
+		cancelations:       params.cancelations,
+		errLogLimiter:      rate.NewLimiter(rate.Every(3*time.Second), 1),
+		sema:               make(chan struct{}, params.concurrency),
+		done:               make(chan struct{}),
+		quit:               make(chan struct{}),
+		abort:              make(chan struct{}),
+		errHandler:         params.errHandler,
+		handler:            HandlerFunc(func(ctx context.Context, t *Task) error { return fmt.Errorf("handler not set") }),
+		shutdownTimeout:    params.shutdownTimeout,
+		starting:           params.starting,
+		finished:           params.finished,
+		idempotencyChecker: idemChecker,
 	}
 }
 
@@ -216,6 +226,21 @@ func (p *processor) exec() {
 				p.handleFailedMessage(ctx, lease, msg, ctx.Err())
 				return
 			default:
+			}
+
+			// Feature 1: Exactly-once semantics — atomic idempotency check.
+			if msg.IdempotencyKey != "" && p.idempotencyChecker != nil {
+				ttl := time.Duration(msg.IdempotencyTTL) * time.Second
+				isFirst, err := p.idempotencyChecker.CheckAndSet(ctx, msg.IdempotencyKey, ttl)
+				if err != nil {
+					p.logger.Warnf("idempotency check failed for task id=%s key=%s: %v", msg.ID, msg.IdempotencyKey, err)
+					// On error, proceed with processing (fail open for availability).
+				} else if !isFirst {
+					// Duplicate task — skip processing, mark as done.
+					p.logger.Infof("Skipping duplicate task id=%s (idempotency key=%s already processed)", msg.ID, msg.IdempotencyKey)
+					p.handleSucceededMessage(lease, msg)
+					return
+				}
 			}
 
 			resCh := make(chan error, 1)

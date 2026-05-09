@@ -297,6 +297,17 @@ type TaskMessage struct {
 	//
 	// Use zero to indicate no value.
 	CompletedAt int64
+
+	// IdempotencyKey is the user-provided key for exactly-once processing semantics.
+	// If set, the worker will atomically check-and-set this key in Redis before processing.
+	// If the key already exists, the task will be skipped (duplicate).
+	//
+	// Empty string means no idempotency check.
+	IdempotencyKey string
+
+	// IdempotencyTTL specifies how long the idempotency key is retained in seconds.
+	// Use zero to use the default (24 hours).
+	IdempotencyTTL int64
 }
 
 // EncodeMessage marshals the given task message and returns an encoded bytes.
@@ -304,10 +315,26 @@ func EncodeMessage(msg *TaskMessage) ([]byte, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("cannot encode nil message")
 	}
+	// Store idempotency metadata in headers so it survives proto serialization.
+	headers := msg.Headers
+	if msg.IdempotencyKey != "" {
+		if headers == nil {
+			headers = make(map[string]string)
+		} else {
+			// clone to avoid mutating the original
+			h2 := make(map[string]string, len(headers)+2)
+			for k, v := range headers {
+				h2[k] = v
+			}
+			headers = h2
+		}
+		headers["__asynq_idempotency_key"] = msg.IdempotencyKey
+		headers["__asynq_idempotency_ttl"] = fmt.Sprintf("%d", msg.IdempotencyTTL)
+	}
 	return proto.Marshal(&pb.TaskMessage{
 		Type:         msg.Type,
 		Payload:      msg.Payload,
-		Headers:      msg.Headers,
+		Headers:      headers,
 		Id:           msg.ID,
 		Queue:        msg.Queue,
 		Retry:        int32(msg.Retry),
@@ -329,22 +356,42 @@ func DecodeMessage(data []byte) (*TaskMessage, error) {
 	if err := proto.Unmarshal(data, &pbmsg); err != nil {
 		return nil, err
 	}
+	headers := pbmsg.GetHeaders()
+	// Extract idempotency metadata from headers, removing the reserved keys.
+	var idempotencyKey string
+	var idempotencyTTL int64
+	if iKey, ok := headers["__asynq_idempotency_key"]; ok {
+		idempotencyKey = iKey
+		if iTTLStr, ok2 := headers["__asynq_idempotency_ttl"]; ok2 {
+			fmt.Sscanf(iTTLStr, "%d", &idempotencyTTL)
+		}
+		// Clone headers without the internal keys so the handler doesn't see them.
+		h2 := make(map[string]string, len(headers))
+		for k, v := range headers {
+			if k != "__asynq_idempotency_key" && k != "__asynq_idempotency_ttl" {
+				h2[k] = v
+			}
+		}
+		headers = h2
+	}
 	return &TaskMessage{
-		Type:         pbmsg.GetType(),
-		Payload:      pbmsg.GetPayload(),
-		Headers:      pbmsg.GetHeaders(),
-		ID:           pbmsg.GetId(),
-		Queue:        pbmsg.GetQueue(),
-		Retry:        int(pbmsg.GetRetry()),
-		Retried:      int(pbmsg.GetRetried()),
-		ErrorMsg:     pbmsg.GetErrorMsg(),
-		LastFailedAt: pbmsg.GetLastFailedAt(),
-		Timeout:      pbmsg.GetTimeout(),
-		Deadline:     pbmsg.GetDeadline(),
-		UniqueKey:    pbmsg.GetUniqueKey(),
-		GroupKey:     pbmsg.GetGroupKey(),
-		Retention:    pbmsg.GetRetention(),
-		CompletedAt:  pbmsg.GetCompletedAt(),
+		Type:           pbmsg.GetType(),
+		Payload:        pbmsg.GetPayload(),
+		Headers:        headers,
+		ID:             pbmsg.GetId(),
+		Queue:          pbmsg.GetQueue(),
+		Retry:          int(pbmsg.GetRetry()),
+		Retried:        int(pbmsg.GetRetried()),
+		ErrorMsg:       pbmsg.GetErrorMsg(),
+		LastFailedAt:   pbmsg.GetLastFailedAt(),
+		Timeout:        pbmsg.GetTimeout(),
+		Deadline:       pbmsg.GetDeadline(),
+		UniqueKey:      pbmsg.GetUniqueKey(),
+		GroupKey:       pbmsg.GetGroupKey(),
+		Retention:      pbmsg.GetRetention(),
+		CompletedAt:    pbmsg.GetCompletedAt(),
+		IdempotencyKey: idempotencyKey,
+		IdempotencyTTL: idempotencyTTL,
 	}, nil
 }
 

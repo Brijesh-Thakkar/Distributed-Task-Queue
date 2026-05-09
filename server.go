@@ -267,6 +267,25 @@ type Config struct {
 	//
 	// If unset or zero, defaults to 30 seconds.
 	VisibilityTimeout time.Duration
+
+	// WeightedQueues specifies queues with weights for deterministic weighted round-robin
+	// scheduling. Unlike Queues (which uses probabilistic random shuffle), WeightedQueues
+	// uses a deterministic interleaved cycle to guarantee precise weight ratios over time.
+	//
+	// Example:
+	//
+	//     WeightedQueues: map[string]int{
+	//         "critical": 6,
+	//         "default":  3,
+	//         "low":      1,
+	//     }
+	//
+	// With the above config, for every 10 polling slots, 6 go to "critical",
+	// 3 to "default", and 1 to "low" in a deterministic interleaved order.
+	//
+	// If both Queues and WeightedQueues are set, WeightedQueues takes precedence.
+	// If WeightedQueues is nil or empty, Queues is used (probabilistic).
+	WeightedQueues map[string]int
 }
 
 // GroupAggregator aggregates a group of tasks into one before the tasks are passed to the Handler.
@@ -488,6 +507,17 @@ func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server {
 			queues[qname] = p
 		}
 	}
+	// Feature 4: If WeightedQueues is set, merge it into queues for queue initialization.
+	if len(cfg.WeightedQueues) > 0 {
+		for qname, p := range cfg.WeightedQueues {
+			if err := base.ValidateQueueName(qname); err != nil {
+				continue
+			}
+			if p > 0 {
+				queues[qname] = p // allow WeightedQueues to be standalone or supplement Queues
+			}
+		}
+	}
 	if len(queues) == 0 {
 		queues = defaultQueueConfig
 	}
@@ -575,6 +605,7 @@ func NewServerFromRedisClient(c redis.UniversalClient, cfg Config) *Server {
 		redisClient:       c,
 		dlqThreshold:      cfg.DLQThreshold,
 		visibilityTimeout: cfg.VisibilityTimeout,
+		weightedQueues:    cfg.WeightedQueues,
 	})
 	recoverer := newRecoverer(recovererParams{
 		logger:         logger,

@@ -81,6 +81,10 @@ type processor struct {
 
 	// visibilityTracker tracks per-task visibility for crash recovery.
 	visibilityTracker *VisibilityTracker
+
+	// weightedRR provides deterministic weighted round-robin queue scheduling.
+	// Non-nil when WeightedQueues config is used.
+	weightedRR *weightedRoundRobin
 }
 
 type processorParams struct {
@@ -102,6 +106,7 @@ type processorParams struct {
 	redisClient       redis.UniversalClient
 	dlqThreshold      int
 	visibilityTimeout time.Duration
+	weightedQueues    map[string]int
 }
 
 // newProcessor constructs a new processor.
@@ -122,6 +127,17 @@ func newProcessor(params processorParams) *processor {
 	dlqThreshold := params.dlqThreshold
 	if dlqThreshold <= 0 {
 		dlqThreshold = defaultDLQThreshold
+	}
+	// Feature 4: Weighted round-robin scheduler.
+	var wrr *weightedRoundRobin
+	if len(params.weightedQueues) > 0 {
+		wrr = newWeightedRoundRobin(params.weightedQueues)
+		// Also merge weighted queues into the regular queues map for Redis key creation.
+		for qname, p := range params.weightedQueues {
+			if p > 0 {
+				queues[qname] = p
+			}
+		}
 	}
 	return &processor{
 		logger:             params.logger,
@@ -149,6 +165,7 @@ func newProcessor(params processorParams) *processor {
 		dlqManager:         dlqMgr,
 		dlqThreshold:       dlqThreshold,
 		visibilityTracker:  visTrk,
+		weightedRR:         wrr,
 	}
 }
 
@@ -462,6 +479,7 @@ func (p *processor) archive(l *base.Lease, msg *base.TaskMessage, e error) {
 // Queue names is sorted by their priority level if strict-priority is true.
 // If strict-priority is false, then the order of queue names are roughly based on
 // the priority level but randomized in order to avoid starving low priority queues.
+// If weightedRR is set, uses deterministic weighted round-robin scheduling (Feature 4).
 func (p *processor) queues() []string {
 	// skip the overhead of generating a list of queue names
 	// if we are processing one queue.
@@ -472,6 +490,10 @@ func (p *processor) queues() []string {
 	}
 	if p.orderedQueues != nil {
 		return p.orderedQueues
+	}
+	// Feature 4: Deterministic weighted round-robin scheduling.
+	if p.weightedRR != nil {
+		return p.weightedRR.queues()
 	}
 	var names []string
 	for qname, priority := range p.queueConfig {

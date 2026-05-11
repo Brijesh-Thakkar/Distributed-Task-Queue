@@ -7,83 +7,90 @@ package asynq
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/hibiken/asynq/internal/base"
 )
 
-// TestDLQTaskRoutedAfterThreshold verifies that a task that always fails is routed
-// to the DLQ after DLQThreshold retries, and can then be requeued and processed.
+// TestDLQTaskRoutedAfterThreshold verifies that a task is routed to the DLQ
+// when it is retried at least DLQThreshold times.
+//
+// Strategy:
+//   - DLQThreshold: 1  → route to DLQ once Retried >= 1
+//   - MaxRetry(1)      → allows exactly 1 retry (Retried goes from 0 → 1)
+//   - Attempt 0: Retried=0, returns error  → scheduled for retry
+//   - Attempt 1: Retried=1, returns SkipRetry → exhaustion path:
+//       msg.Retried(1) >= dlqThreshold(1) → task goes to DLQ
+//   - RetryDelayFunc: 100ms for fast test
+//   - forwarder runs every 5s; 10s wait covers ≥1 forwarder cycle
 func TestDLQTaskRoutedAfterThreshold(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
 
-	const threshold = 2
-	const taskType = "dlq:always-fail"
-
-	var processCount int
-	handler := HandlerFunc(func(ctx context.Context, task *Task) error {
-		processCount++
-		if processCount <= threshold+1 {
-			return fmt.Errorf("always fails (attempt %d)", processCount)
-		}
-		// Success on requeue.
-		return nil
-	})
+	var callCount atomic.Int32
 
 	client := NewClientFromRedisClient(r)
 	defer client.Close()
 
-	task := NewTask(taskType, []byte(`{"test":true}`), MaxRetry(threshold))
+	task := NewTask("dlq:route-test", []byte(`{}`), MaxRetry(1))
 	info, err := client.Enqueue(task)
 	if err != nil {
-		t.Fatalf("Failed to enqueue task: %v", err)
+		t.Fatalf("enqueue: %v", err)
 	}
-	t.Logf("Enqueued task: id=%s", info.ID)
+	t.Logf("enqueued task id=%s", info.ID)
+
+	handler := HandlerFunc(func(ctx context.Context, task *Task) error {
+		n := callCount.Add(1)
+		t.Logf("attempt %d for task %s", n, info.ID)
+		if n >= 2 {
+			// Second attempt: return SkipRetry so retries are immediately exhausted.
+			// msg.Retried == 1 at this point, which is >= DLQThreshold(1) → DLQ.
+			return fmt.Errorf("permanent: %w", SkipRetry)
+		}
+		return fmt.Errorf("transient failure (attempt %d)", n)
+	})
 
 	srv := NewServerFromRedisClient(r, Config{
 		Concurrency:       1,
 		Queues:            map[string]int{"default": 1},
-		TaskCheckInterval: 100 * time.Millisecond,
-		DLQThreshold:      threshold,
-		// Very short retry delay so tests run fast.
+		TaskCheckInterval: 50 * time.Millisecond,
+		DLQThreshold:      1,
 		RetryDelayFunc: func(n int, e error, t *Task) time.Duration {
-			return 100 * time.Millisecond
+			return 100 * time.Millisecond // very short so retry happens quickly
 		},
 	})
-
 	if err := srv.Start(handler); err != nil {
-		t.Fatalf("Failed to start server: %v", err)
+		t.Fatalf("start server: %v", err)
 	}
 
-	// Wait for task to fail through all retries and land in DLQ.
-	time.Sleep(3 * time.Second)
+	// 10s: enough for both attempts + ≥1 forwarder cycle (runs every 5s).
+	time.Sleep(10 * time.Second)
 	srv.Shutdown()
 
-	// Check that task is in DLQ.
+	t.Logf("total call count: %d", callCount.Load())
+
 	mgr := newDLQManager(r)
 	dlqTasks, err := mgr.listDLQ(context.Background(), "default")
 	if err != nil {
-		t.Fatalf("Failed to list DLQ: %v", err)
+		t.Fatalf("listDLQ: %v", err)
 	}
 
-	var foundInDLQ bool
+	var found bool
 	for _, dt := range dlqTasks {
 		if dt.ID == info.ID {
-			foundInDLQ = true
-			t.Logf("✓ Task found in DLQ: id=%s retried=%d lastErr=%s", dt.ID, dt.Retried, dt.LastErr)
-			break
+			found = true
+			t.Logf("✓ task found in DLQ: id=%s retried=%d lastErr=%s", dt.ID, dt.Retried, dt.LastErr)
 		}
 	}
-
-	if !foundInDLQ {
-		t.Logf("DLQ tasks: %+v", dlqTasks)
-		t.Errorf("Expected task id=%s to be in DLQ after %d retries, but it was not found", info.ID, threshold)
+	if !found {
+		t.Logf("calls=%d, dlq_size=%d", callCount.Load(), len(dlqTasks))
+		t.Errorf("task id=%s not found in DLQ; check DLQ routing logic", info.ID)
 	}
 }
 
-// TestDLQListEndpointReturnsJSON verifies that the DLQ list function works.
+// TestDLQManagerList verifies low-level DLQ list/send operations.
 func TestDLQManagerList(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
@@ -94,13 +101,13 @@ func TestDLQManagerList(t *testing.T) {
 	// Initially empty.
 	tasks, err := mgr.listDLQ(ctx, "default")
 	if err != nil {
-		t.Fatalf("listDLQ returned error: %v", err)
+		t.Fatalf("listDLQ: %v", err)
 	}
 	if len(tasks) != 0 {
-		t.Errorf("Expected empty DLQ, got %d tasks", len(tasks))
+		t.Errorf("expected empty DLQ, got %d tasks", len(tasks))
 	}
 
-	// Send a fake task to DLQ.
+	// Insert a task directly into DLQ.
 	fakeMsg := &base.TaskMessage{
 		ID:           "test-dlq-id-1",
 		Type:         "test:task",
@@ -112,19 +119,18 @@ func TestDLQManagerList(t *testing.T) {
 		LastFailedAt: time.Now().Unix(),
 	}
 	if err := mgr.sendToDLQ(ctx, "default", fakeMsg); err != nil {
-		t.Fatalf("sendToDLQ returned error: %v", err)
+		t.Fatalf("sendToDLQ: %v", err)
 	}
 
-	// List should return 1 task.
 	tasks, err = mgr.listDLQ(ctx, "default")
 	if err != nil {
-		t.Fatalf("listDLQ returned error: %v", err)
+		t.Fatalf("listDLQ: %v", err)
 	}
 	if len(tasks) != 1 {
-		t.Fatalf("Expected 1 task in DLQ, got %d", len(tasks))
+		t.Fatalf("expected 1 task, got %d", len(tasks))
 	}
 	if tasks[0].ID != "test-dlq-id-1" {
-		t.Errorf("Expected task ID 'test-dlq-id-1', got %q", tasks[0].ID)
+		t.Errorf("expected id 'test-dlq-id-1', got %q", tasks[0].ID)
 	}
-	t.Logf("✓ DLQ list works correctly, found task id=%s", tasks[0].ID)
+	t.Logf("✓ DLQ list: found task id=%s", tasks[0].ID)
 }

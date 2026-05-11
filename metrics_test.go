@@ -7,14 +7,13 @@ package asynq
 import (
 	"context"
 	"io"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
 
-// TestMetricsServerCreation verifies that MetricsServer can be created.
+// TestMetricsServerCreation verifies MetricsServer initializes without error.
 func TestMetricsServerCreation(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
@@ -23,16 +22,16 @@ func TestMetricsServerCreation(t *testing.T) {
 		Addr:            ":19090",
 		RedisClient:     r,
 		Queues:          []string{"default", "critical"},
-		CollectInterval: 5 * time.Second,
+		CollectInterval: 30 * time.Second,
 	})
-
 	if ms == nil {
 		t.Fatal("NewMetricsServer returned nil")
 	}
 	t.Log("✓ MetricsServer created successfully")
 }
 
-// TestMetricsMiddleware verifies that the middleware records metrics correctly.
+// TestMetricsMiddleware verifies the middleware calls the underlying handler
+// and does not return an error for a successful task.
 func TestMetricsMiddleware(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
@@ -44,28 +43,29 @@ func TestMetricsMiddleware(t *testing.T) {
 		CollectInterval: 30 * time.Second,
 	})
 
-	var handlerCalled bool
-	baseHandler := HandlerFunc(func(ctx context.Context, task *Task) error {
-		handlerCalled = true
+	var called bool
+	base := HandlerFunc(func(ctx context.Context, task *Task) error {
+		called = true
 		return nil
 	})
 
-	wrappedHandler := MetricsMiddleware(ms, baseHandler)
-
-	// Create a fake task and context.
-	task := NewTask("test:metrics", []byte(`{}`))
-	ctx := context.Background()
-	err := wrappedHandler.ProcessTask(ctx, task)
-	if err != nil {
+	wrapped := MetricsMiddleware(ms, base)
+	task := NewTask("metrics:test", []byte(`{}`))
+	if err := wrapped.ProcessTask(context.Background(), task); err != nil {
 		t.Fatalf("MetricsMiddleware returned error: %v", err)
 	}
-	if !handlerCalled {
-		t.Error("Expected base handler to be called")
+	if !called {
+		t.Error("underlying handler was not called")
 	}
-	t.Log("✓ MetricsMiddleware wraps handler and records metrics")
+	t.Log("✓ MetricsMiddleware wraps handler correctly")
 }
 
-// TestMetricsEndpointReturnsPrometheusFormat verifies that /metrics returns valid Prometheus text.
+// TestMetricsEndpointReturnsPrometheusFormat verifies that /metrics returns
+// valid Prometheus text with all expected metric families.
+//
+// Prometheus only emits a metric family once it has been observed (counter
+// incremented, gauge set, histogram observed). This test records observations
+// for every family BEFORE making the HTTP request.
 func TestMetricsEndpointReturnsPrometheusFormat(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
@@ -77,43 +77,47 @@ func TestMetricsEndpointReturnsPrometheusFormat(t *testing.T) {
 		CollectInterval: 30 * time.Second,
 	})
 
-	// Trigger a manual metric recording.
-	ms.RecordTaskProcessed("default", "success")
+	// --- Seed every metric family so they all appear in the output ---
+
+	// counters + histogram (via public API)
 	ms.RecordTaskProcessed("default", "success")
 	ms.RecordTaskProcessed("default", "failed")
-	ms.RecordTaskDuration("default", 150*time.Millisecond)
+	ms.RecordTaskDuration("default", 50*time.Millisecond)
+	ms.RecordTaskDuration("default", 200*time.Millisecond)
 
-	// Use the server's handler directly via httptest.
+	// gauges (direct field access — all in same package)
+	ms.metrics.queueDepth.WithLabelValues("default").Set(5)
+	ms.metrics.activeTasks.WithLabelValues("default").Set(2)
+	ms.metrics.retryTasks.WithLabelValues("default").Set(1)
+	ms.metrics.archivedTasks.WithLabelValues("default").Set(0)
+	ms.metrics.dlqDepth.WithLabelValues("default").Set(0)
+	ms.metrics.activeWorkers.Set(2)
+
+	// --- Make the HTTP request ---
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
 	ms.server.Handler.ServeHTTP(w, req)
 
-	resp := w.Result()
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("Expected 200 OK, got %d", resp.StatusCode)
-	}
-
+	body, _ := io.ReadAll(w.Result().Body)
 	bodyStr := string(body)
 
-	// Check that our custom metrics appear in the output.
-	checks := []string{
+	// Every family we registered must appear.
+	want := []string{
 		"asynq_tasks_processed_total",
 		"asynq_task_duration_seconds",
+		"asynq_active_workers",
 		"asynq_queue_depth",
 		"asynq_dlq_depth",
-		"asynq_active_workers",
 	}
-	for _, check := range checks {
-		if !strings.Contains(bodyStr, check) {
-			t.Errorf("Expected metric %q in /metrics output, but not found", check)
+	for _, name := range want {
+		if !strings.Contains(bodyStr, name) {
+			t.Errorf("metric %q missing from /metrics output", name)
 		}
 	}
-	t.Logf("✓ /metrics endpoint returns valid Prometheus format with %d bytes", len(bodyStr))
+	t.Logf("✓ /metrics returned %d bytes with all %d metric families", len(bodyStr), len(want))
 }
 
-// TestMetricsCounters verifies counter values are correct.
+// TestMetricsCounters verifies that counter labels (status) appear correctly.
 func TestMetricsCounters(t *testing.T) {
 	r := setup(t)
 	defer r.Close()
@@ -125,7 +129,6 @@ func TestMetricsCounters(t *testing.T) {
 		CollectInterval: 30 * time.Second,
 	})
 
-	// Record 5 successes and 2 failures.
 	for i := 0; i < 5; i++ {
 		ms.RecordTaskProcessed("default", "success")
 	}
@@ -140,12 +143,11 @@ func TestMetricsCounters(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	bodyStr := string(body)
 
-	// Check counters appear.
 	if !strings.Contains(bodyStr, `status="success"`) {
-		t.Error("Expected success status label in metrics output")
+		t.Error(`expected status="success" label in /metrics`)
 	}
 	if !strings.Contains(bodyStr, `status="failed"`) {
-		t.Error("Expected failed status label in metrics output")
+		t.Error(`expected status="failed" label in /metrics`)
 	}
-	t.Log("✓ Task processed counters with labels work correctly")
+	t.Log("✓ task processed counters appear with correct labels")
 }

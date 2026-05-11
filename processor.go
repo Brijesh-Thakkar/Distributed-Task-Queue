@@ -125,9 +125,7 @@ func newProcessor(params processorParams) *processor {
 		visTrk = NewVisibilityTracker(params.redisClient, params.visibilityTimeout)
 	}
 	dlqThreshold := params.dlqThreshold
-	if dlqThreshold <= 0 {
-		dlqThreshold = defaultDLQThreshold
-	}
+	// dlqThreshold is already defaulted by the caller (server.go); use as-is.
 	// Feature 4: Weighted round-robin scheduler.
 	var wrr *weightedRoundRobin
 	if len(params.weightedQueues) > 0 {

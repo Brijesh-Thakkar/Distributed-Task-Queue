@@ -460,6 +460,20 @@ const (
 	defaultJanitorBatchSize = 100
 )
 
+// effectiveDLQThreshold returns the configured DLQ threshold, or defaultDLQThreshold
+// when the caller did not set one (cfg.DLQThreshold == 0 means "use default").
+// Set cfg.DLQThreshold to a negative value to route tasks to DLQ immediately on first failure.
+func effectiveDLQThreshold(cfgVal int) int {
+	if cfgVal == 0 {
+		return defaultDLQThreshold // unset → use default (3)
+	}
+	if cfgVal < 0 {
+		return 0 // negative → route to DLQ immediately (0 retries before DLQ)
+	}
+	return cfgVal
+}
+
+
 // NewServer returns a new Server given a redis connection option
 // and server configuration.
 func NewServer(r RedisConnOpt, cfg Config) *Server {

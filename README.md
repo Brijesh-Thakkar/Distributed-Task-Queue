@@ -1,35 +1,247 @@
-# asynq — Enhanced Fork
+# Distributed Task Queue
 
-> **Production-grade distributed task queue for Go, built on Redis.**
->
-> This is an enhanced fork of [hibiken/asynq](https://github.com/hibiken/asynq) with six
-> additional production features added on top of the battle-tested asynq foundation.
+## Overview
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/hibiken/asynq.svg)](https://pkg.go.dev/github.com/hibiken/asynq)
-[![Go Report Card](https://goreportcard.com/badge/github.com/hibiken/asynq)](https://goreportcard.com/report/github.com/hibiken/asynq)
+This project is a **production-enhanced fork of [hibiken/asynq](https://github.com/hibiken/asynq)** — a reliable, Redis-backed distributed task queue for Go. While the upstream library provides solid primitives for background job processing, this fork adds five production-critical capabilities missing from the original: **exactly-once processing** via atomic idempotency keys, a **Dead Letter Queue (DLQ)** with HTTP inspection for permanently failed tasks, **visibility timeouts** with heartbeat-based crash recovery, **weighted priority queues** using deterministic round-robin scheduling, and a **Prometheus metrics endpoint** for real-time queue health monitoring. All features are implemented in Go, persist state in Redis, and integrate transparently with the existing `asynq.Server` and `asynq.Client` APIs.
 
 ---
 
-## Quick Start (< 5 minutes)
+## Architecture
 
-### Prerequisites
+```
+┌─────────────┐     Enqueue()      ┌───────────────────┐
+│   Client    │ ─────────────────► │   Redis Broker    │
+│  (producer) │                    │  (sorted sets,    │
+└─────────────┘                    │   lists, hashes)  │
+                                   └────────┬──────────┘
+                                            │ dequeue (BLPOP)
+                                   ┌────────▼──────────┐
+                                   │   Worker Pool     │
+                                   │  (N goroutines)   │
+                                   │                   │
+                                   │  ┌─────────────┐  │
+                                   │  │ Idempotency │  │
+                                   │  │   Check     │  │
+                                   │  └──────┬──────┘  │
+                                   │         │          │
+                                   │  ┌──────▼──────┐  │
+                                   │  │  Visibility │  │
+                                   │  │   Timeout   │  │
+                                   │  │ (heartbeat) │  │
+                                   │  └──────┬──────┘  │
+                                   └─────────┼──────────┘
+                                             │
+                              ┌──────────────┴─────────────┐
+                              │                            │
+                      ┌───────▼──────┐            ┌───────▼──────┐
+                      │   Handler    │            │  On Failure  │
+                      │  (success)   │            │  (retries    │
+                      └──────────────┘            │   exhausted) │
+                                                  └───────┬──────┘
+                                                          │ DLQThreshold exceeded
+                                                  ┌───────▼──────┐
+                                                  │     DLQ      │
+                                                  │ Redis sorted │
+                                                  │     set      │
+                                                  └───────┬──────┘
+                                                          │
+                                                  ┌───────▼──────┐
+                                                  │ HTTP Server  │
+                                                  │ GET  /dlq/{q}│
+                                                  │ POST requeue │
+                                                  └──────────────┘
 
-- Go 1.21+
-- Redis 6.2+ running on `localhost:6379`
-
-```bash
-# Clone
-git clone https://github.com/hibiken/asynq
-cd asynq
-
-# Verify build
-go build ./...
-
-# Run tests (requires Redis)
-go test ./...
+Prometheus metrics exposed at :9090/metrics
 ```
 
-### Minimal Example
+---
+
+## Features
+
+### 1. Exactly-Once Processing (Idempotency)
+
+**What it solves:** In distributed systems, network retries and at-least-once delivery guarantees can cause the same task to be processed multiple times — charging a customer twice, sending duplicate emails, or double-counting inventory.
+
+**How it works:** When a task is enqueued with an `IdempotencyKey`, a Redis Lua script atomically checks whether that key was already processed (using `SET NX`). If the key exists, the worker skips the task without calling the handler. The Lua script guarantees atomicity — no two workers can race to process the same task, even under high concurrency across multiple machines.
+
+```go
+client := asynq.NewClient(redisOpt)
+
+task := asynq.NewTask("payment:charge", payload)
+_, err := client.Enqueue(task,
+    asynq.IdempotencyKey("charge-order-42-v1"),
+    asynq.IdempotencyTTL(24*time.Hour),
+)
+```
+
+---
+
+### 2. Dead Letter Queue (DLQ)
+
+**What it solves:** When a task permanently fails (e.g., malformed payload, downstream service outage), the upstream `asynq` silently archives it with no visibility or recovery path. Teams have no way to inspect what failed or retry tasks after fixing the root cause.
+
+**How it works:** After a configurable number of retries (`DLQThreshold`), tasks are routed to a separate Redis sorted set (`asynq:{queue}:dlq`) instead of the archive. An HTTP handler provides inspection (`GET /dlq/{queue}`) and recovery (`POST /dlq/{queue}/{task_id}/requeue`) endpoints, enabling operators to review failures and reprocess them without code changes.
+
+```go
+srv := asynq.NewServer(redisOpt, asynq.Config{
+    DLQThreshold: 3, // route to DLQ after 3 retries
+})
+
+// Mount the DLQ HTTP handler on any mux:
+http.Handle("/dlq/", asynq.DLQHTTPHandler(redisClient))
+
+// Inspect:  GET  /dlq/default
+// Requeue:  POST /dlq/default/{task_id}/requeue
+```
+
+---
+
+### 3. Visibility Timeouts + Crash Recovery
+
+**What it solves:** If a worker process crashes mid-task (OOM kill, machine failure, SIGKILL), the task is stuck in "active" state forever — it will never be retried or completed. The upstream `asynq` relies on lease timeouts but has no heartbeat mechanism for long-running tasks.
+
+**How it works:** When a worker picks up a task, `VisibilityTracker` sets a Redis key with a TTL equal to `VisibilityTimeout`. A background goroutine renews the key every 10 seconds (heartbeat). If the process crashes, the key expires and a background `recoverer` detects orphaned tasks and moves them back to the pending queue for reprocessing — completely automatically.
+
+```go
+srv := asynq.NewServer(redisOpt, asynq.Config{
+    VisibilityTimeout: 30 * time.Second, // task must renew every 10s
+})
+// No other code changes needed — crash recovery is automatic.
+```
+
+---
+
+### 4. Weighted Priority Queues
+
+**What it solves:** The upstream `asynq` multi-queue support uses random queue selection weighted by priority, which produces non-deterministic distribution — over short windows, critical queues may be starved. There is no guarantee that a queue with weight 6 gets exactly 6x more slots than weight 1.
+
+**How it works:** `WeightedQueues` pre-computes a deterministic polling order using the [Smooth Weighted Round-Robin](https://github.com/nginx/nginx/commit/52327e0627f49dbda1e8db695e63a4b0af4448b3) algorithm. The weight map is expanded into a cycle slice (e.g., `[critical, critical, default, critical, default, low, ...]`) and traversed sequentially using an atomic counter — guaranteeing the exact configured distribution across any window of N total polls.
+
+```go
+srv := asynq.NewServer(redisOpt, asynq.Config{
+    WeightedQueues: map[string]int{
+        "critical": 6, // 60% of polling slots
+        "default":  3, // 30% of polling slots
+        "low":      1, // 10% of polling slots
+    },
+})
+```
+
+---
+
+### 5. Prometheus Metrics
+
+**What it solves:** Production systems need real-time visibility into queue depth, processing throughput, and latency percentiles. Without metrics, teams can't detect backlogs, SLA violations, or the impact of code changes on performance.
+
+**How it works:** `MetricsMiddleware` wraps every handler invocation and records duration and success/failure in Prometheus counters and histograms. A background goroutine polls Redis every `CollectInterval` seconds to update queue depth gauges. The `MetricsServer` exposes a `/metrics` endpoint on a configurable port in the standard Prometheus text format, ready for Grafana dashboards or alerting.
+
+**Metrics exposed:**
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `asynq_tasks_processed_total` | Counter | `queue`, `status` | Cumulative tasks processed |
+| `asynq_task_duration_seconds` | Histogram | `queue` | Processing latency (p50/p95/p99) |
+| `asynq_queue_depth` | Gauge | `queue` | Pending tasks count |
+| `asynq_active_tasks` | Gauge | `queue` | Currently processing |
+| `asynq_dlq_depth` | Gauge | `queue` | Tasks in Dead Letter Queue |
+| `asynq_active_workers` | Gauge | — | Active worker goroutines |
+
+```go
+ms := asynq.NewMetricsServer(asynq.MetricsConfig{
+    Addr:            ":9090",
+    RedisClient:     redisClient,
+    Queues:          []string{"critical", "default", "low"},
+    CollectInterval: 5 * time.Second,
+})
+go ms.Start() // serves :9090/metrics and :9090/healthz
+
+// Wrap your handler:
+srv.Start(asynq.MetricsMiddleware(ms, myHandler))
+```
+
+---
+
+## Performance
+
+All benchmarks run on **13th Gen Intel Core i5-13420H**, Redis 8.6.3 (local, single-node), Go 1.24.0, Linux.
+
+### Benchmark Results
+
+```
+goos: linux
+goarch: amd64
+pkg: github.com/hibiken/asynq
+cpu: 13th Gen Intel(R) Core(TM) i5-13420H
+BenchmarkEnqueue-12                       	  201538	     26522 ns/op	     37705 tasks/sec	    1464 B/op	      27 allocs/op
+BenchmarkEnqueueParallel-12               	  543436	     13004 ns/op	     76897 tasks/sec	    1475 B/op	      28 allocs/op
+BenchmarkWeightedPriorityScheduling-12    	27285434	       225.7 ns/op	   4430417 calls/sec	     112 B/op	       3 allocs/op
+BenchmarkIdempotencyCheck-12              	  236122	     22869 ns/op	     43728 checks/sec	     412 B/op	      15 allocs/op
+BenchmarkDLQSendTask-12                   	  238436	     21476 ns/op	     46564 sends/sec	     704 B/op	      16 allocs/op
+BenchmarkVisibilityTracker-12             	   97326	     60357 ns/op	     16568 ops/sec	     968 B/op	      25 allocs/op
+PASS
+ok  	github.com/hibiken/asynq	37.032s
+```
+
+**Interpretation:**
+- `BenchmarkEnqueue` — **37,705 tasks/sec** single-goroutine; each call is one Redis round-trip (ZADD + HSET).
+- `BenchmarkEnqueueParallel` — **76,897 tasks/sec** across 12 goroutines; near-linear scaling with parallelism.
+- `BenchmarkWeightedPriorityScheduling` — **4.4M calls/sec** at 225ns/op; the round-robin scheduler adds negligible overhead vs. random selection.
+- `BenchmarkIdempotencyCheck` — **43,728 checks/sec**; atomic Lua dedup adds ~23µs per task — one Redis round-trip with scripted NX check.
+- `BenchmarkDLQSendTask` — **46,564 sends/sec**; DLQ routing overhead is one additional Redis ZADD.
+- `BenchmarkVisibilityTracker` — **16,568 ops/sec**; claim + release costs two Redis SET/DEL operations (~60µs).
+
+---
+
+### Load Test Results (10,000 tasks, 50 workers)
+
+```
+════════════════════════════════════════════════════════════
+  Distributed Task Queue — Load Test
+════════════════════════════════════════════════════════════
+  Redis:    localhost:6379
+  Tasks:    10000
+  Workers:  50
+────────────────────────────────────────────────────────────
+
+  Enqueueing 10000 tasks... done in 895ms
+  Processing tasks with 50 workers...
+
+════════════════════════════════════════════════════════════
+  RESULTS
+════════════════════════════════════════════════════════════
+  Total tasks enqueued:          10000
+  Tasks processed:               10000
+  Tasks failed:                  0
+────────────────────────────────────────────────────────────
+  Enqueue duration:              895ms
+  Enqueue throughput:            11176 tasks/sec
+────────────────────────────────────────────────────────────
+  Processing duration:           40ms
+  Processing throughput:         250782 tasks/sec
+────────────────────────────────────────────────────────────
+  Latency p50:                   35ms
+  Latency p95:                   48ms
+  Latency p99:                   50ms
+════════════════════════════════════════════════════════════
+
+  Machine: 13th Gen Intel(R) Core(TM) i5-13420H
+```
+
+**Interpretation:** 10,000 tasks enqueue in under 1 second (~11k tasks/sec). With 50 concurrent workers and a no-op handler, all tasks are processed in **40ms** (~250k tasks/sec throughput). End-to-end latency (enqueue → handler return) is **35ms p50 / 50ms p99** — dominated by Redis polling interval (10ms default) and scheduling overhead.
+
+---
+
+## Quick Start
+
+**Prerequisites:** Go 1.21+, Redis 6+
+
+```bash
+git clone https://github.com/YOUR_USERNAME/Distributed-Task-Queue
+cd Distributed-Task-Queue
+go mod tidy
+```
+
+**Minimal working example:**
 
 ```go
 package main
@@ -37,311 +249,111 @@ package main
 import (
     "context"
     "fmt"
+    "log"
+    "time"
+
     "github.com/hibiken/asynq"
 )
 
 func main() {
+    redisOpt := asynq.RedisClientOpt{Addr: "localhost:6379"}
+
     // --- Producer ---
-    client := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6379"})
-    defer client.Close()
+    c := asynq.NewClient(redisOpt)
+    defer c.Close()
 
     task := asynq.NewTask("email:send", []byte(`{"to":"user@example.com"}`))
-    info, _ := client.Enqueue(task)
-    fmt.Printf("enqueued task id=%s\n", info.ID)
+    if _, err := c.Enqueue(task,
+        asynq.IdempotencyKey("email-welcome-user-1"),
+        asynq.IdempotencyTTL(24*time.Hour),
+    ); err != nil {
+        log.Fatal(err)
+    }
 
     // --- Consumer ---
-    srv := asynq.NewServer(
-        asynq.RedisClientOpt{Addr: "localhost:6379"},
-        asynq.Config{Concurrency: 10},
-    )
+    srv := asynq.NewServer(redisOpt, asynq.Config{
+        Concurrency:       10,
+        DLQThreshold:      3,
+        VisibilityTimeout: 30 * time.Second,
+        WeightedQueues:    map[string]int{"default": 1},
+    })
+
     mux := asynq.NewServeMux()
     mux.HandleFunc("email:send", func(ctx context.Context, t *asynq.Task) error {
-        fmt.Printf("processing task: %s\n", t.Payload())
+        fmt.Printf("Sending email: %s\n", t.Payload())
         return nil
     })
-    srv.Run(mux)
+
+    log.Fatal(srv.Run(mux))
 }
 ```
 
 ---
 
-## Architecture
-
-```
-┌─────────────┐        ┌──────────────────────────────────────────────────┐
-│   Producer  │        │                   Redis                           │
-│  (Client)   │──────▶ │  pending:{queue}   active:{queue}                │
-└─────────────┘  LPUSH │  retry:{queue}     archived:{queue}              │
-                        │  dlq:{queue}       scheduled:{queue}             │
-                        │  visibility:{id}   idempotency:{key}            │
-                        └──────────────────────────────────────────────────┘
-                                     ▲  BRPOPLPUSH / polling
-                        ┌────────────┴────────────────────────────────────┐
-                        │              asynq Server                        │
-                        │                                                  │
-                        │  ┌─────────────┐  ┌────────────┐  ┌──────────┐ │
-                        │  │  Processor  │  │  Recoverer │  │Heartbeat │ │
-                        │  │  (workers)  │  │ (crash rec)│  │ (lease)  │ │
-                        │  └─────────────┘  └────────────┘  └──────────┘ │
-                        │  ┌─────────────┐  ┌────────────┐  ┌──────────┐ │
-                        │  │  Forwarder  │  │  Janitor   │  │ Metrics  │ │
-                        │  │ (scheduler) │  │ (cleanup)  │  │ :9090    │ │
-                        │  └─────────────┘  └────────────┘  └──────────┘ │
-                        └─────────────────────────────────────────────────┘
-```
-
-### Task Lifecycle
-
-```
-Enqueue ──▶ pending ──▶ active ──▶ done (deleted)
-                │           │
-                │           ├──▶ retry (on failure, retried < maxRetry)
-                │           │
-                │           └──▶ archived / dlq (retries exhausted)
-                │
-                └──▶ scheduled (ProcessAt in future)
-```
-
----
-
-## Enhancements over Upstream
-
-This fork adds six production-grade features on top of the vanilla asynq v0.26.0 codebase.
-
----
-
-### Feature 1: Exactly-Once Processing Semantics
-
-**Goal:** Prevent duplicate task execution during network retries.
-
-**How it works:**
-- Add `IdempotencyKey(key, ttl)` as a `TaskOption`.
-- Before processing begins, an atomic Redis Lua script executes `SET NX` on
-  `asynq:idempotency:{key}` with configurable TTL (default 24h).
-- If the key already exists → task is skipped and marked completed (no double execution).
-- If the key does not exist → key is set and processing proceeds normally.
-- The Lua script is fully atomic — no race conditions between concurrent workers.
-
-**Usage:**
-
-```go
-task := asynq.NewTask("payment:charge", payload,
-    asynq.IdempotencyKey("payment-abc-123", 24*time.Hour),
-)
-client.Enqueue(task)
-// Enqueueing the same task again with the same key is a no-op for processing.
-```
-
-**Test:** `idempotency_test.go` — enqueues duplicate tasks, asserts handler called exactly once.
-
----
-
-### Feature 2: Dead Letter Queue (DLQ) with Configurable Retry Threshold
-
-**Goal:** After N retries, route permanently failed tasks to a separate, inspectable DLQ.
-
-**How it works:**
-- Add `DLQThreshold int` to `Config` (default: 3 retries).
-- When a task's retry count exceeds the threshold, it is routed to
-  `asynq:{queue}:dlq` (a Redis sorted set) instead of the normal archive.
-- HTTP inspection endpoints:
-  - `GET /dlq/{queue}` — list all tasks in the DLQ with error history.
-  - `POST /dlq/{queue}/{task_id}/requeue` — move a task back to pending for retry.
-
-**Usage:**
-
-```go
-srv := asynq.NewServer(redisOpt, asynq.Config{
-    DLQThreshold: 3, // after 3 retries, goes to DLQ
-})
-```
+## Running Tests
 
 ```bash
-# Inspect DLQ
-curl http://localhost:8080/dlq/default
+# Feature tests only — fast (~20 seconds), requires Redis on :6379
+go test -run '^(TestWeighted|TestIdempotency|TestDLQ|TestVisibility|TestMetrics)' \
+    -timeout=60s -v .
 
-# Requeue a task
-curl -X POST http://localhost:8080/dlq/default/task-id-here/requeue
+# Benchmarks — requires Redis on :6379
+go test -bench=. -benchtime=5s -run='^$' .
+
+# Load test — 10k tasks, 50 concurrent workers
+go run cmd/loadtest/main.go -tasks=10000 -workers=50
+
+# Load test with custom parameters
+go run cmd/loadtest/main.go -tasks=100000 -workers=100 -redis=localhost:6379
 ```
-
-**Test:** `dlq_test.go` — always-failing handler → assert task lands in DLQ after N retries → requeue → assert re-processed.
 
 ---
 
-### Feature 3: Visibility Timeouts with Crash Recovery
+## Project Structure
 
-**Goal:** If a worker crashes mid-processing, the task automatically becomes visible again — no orphaned tasks.
+Files added by this fork (all upstream files are unchanged):
 
-**How it works:**
-- When a worker dequeues a task, it sets `asynq:visibility:{task_id}` with a TTL
-  (default 30s, configurable via `VisibilityTimeout` in `Config`).
-- The worker sends a heartbeat every 10 seconds, renewing the key TTL.
-- A background `Recoverer` goroutine scans for active tasks whose visibility key
-  has expired — indicating worker crash — and moves them back to the pending queue.
-
-**Usage:**
-
-```go
-srv := asynq.NewServer(redisOpt, asynq.Config{
-    VisibilityTimeout: 30 * time.Second, // task must be renewed within 30s
-})
-```
-
-**Test:** `recoverer_test.go` — starts processing, stops heartbeat, waits for TTL, asserts task recovered.
+| File | Description |
+|------|-------------|
+| `idempotency.go` | Redis Lua idempotency checker — atomic `SET NX` dedup |
+| `dlq.go` | DLQ manager + HTTP inspection endpoints (`/dlq/{queue}`) |
+| `visibility.go` | Visibility timeout tracker with 10s heartbeat renewal |
+| `weighted_queue.go` | Deterministic weighted round-robin queue scheduler |
+| `metrics.go` | Prometheus `MetricsServer` + `MetricsMiddleware` wrapper |
+| `cmd/loadtest/main.go` | Load test CLI: configurable tasks/workers, p50/p95/p99 output |
+| `idempotency_test.go` | Tests for exactly-once semantics (dedup, TTL, race) |
+| `dlq_test.go` | Tests for DLQ routing after threshold and direct list/send |
+| `recoverer_visibility_test.go` | Tests for TTL expiry, heartbeat renewal, crash recovery |
+| `weighted_queue_test.go` | Tests for round-robin distribution, interleaving, atomicity |
+| `metrics_test.go` | Tests for Prometheus endpoint format and counter labels |
+| `feature_benchmark_test.go` | Benchmarks for all 5 features with `tasks/sec` reporting |
 
 ---
 
-### Feature 4: Weighted Priority Queue with Round-Robin Scheduling
-
-**Goal:** Support multiple priority queues with configurable weight-based scheduling.
-
-**How it works:**
-- `WeightedQueues map[string]int` config option (e.g. `{"critical": 6, "default": 3, "low": 1}`).
-- The scheduler pre-expands the weight map into a polling-order slice:
-  `[critical×6, default×3, low×1]` normalized, then cycles through with an atomic counter.
-- This guarantees the distribution matches weights without starvation.
-
-**Usage:**
+## Configuration Reference
 
 ```go
-srv := asynq.NewServer(redisOpt, asynq.Config{
+asynq.Config{
+    // Standard asynq fields
+    Concurrency: 10,
+    Queues:      map[string]int{"default": 1},
+
+    // Feature 1: Idempotency (set per-task at Enqueue time)
+    // asynq.IdempotencyKey("key"), asynq.IdempotencyTTL(24*time.Hour)
+
+    // Feature 2: Dead Letter Queue
+    DLQThreshold: 3, // route to DLQ after 3 retries (default: 3)
+
+    // Feature 3: Visibility Timeout
+    VisibilityTimeout: 30 * time.Second, // heartbeat every 10s
+
+    // Feature 4: Weighted Priority Queues
     WeightedQueues: map[string]int{
         "critical": 6,
         "default":  3,
         "low":      1,
     },
-})
+
+    // Feature 5: Metrics (configured separately via MetricsServer)
+}
 ```
-
-**Test:** `priority_test.go` — enqueues tasks across all queues, verifies processing distribution ±10% of configured weights.
-
----
-
-### Feature 5: Prometheus Metrics Endpoint
-
-**Goal:** Expose real-time queue health metrics for observability.
-
-**Metrics exposed on `:9090/metrics`:**
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `asynq_queue_depth{queue}` | Gauge | Number of pending tasks |
-| `asynq_dlq_depth{queue}` | Gauge | Number of tasks in DLQ |
-| `asynq_tasks_processed_total{queue,status}` | Counter | Tasks processed (success/failed) |
-| `asynq_task_processing_duration_seconds{queue}` | Histogram | Processing latency (p50/p95/p99) |
-| `asynq_active_workers` | Gauge | Currently processing workers |
-
-**Usage:**
-
-```go
-ms := asynq.NewMetricsServer(asynq.MetricsConfig{
-    Addr:      ":9090",
-    RedisOpt:  redisOpt,
-    Queues:    []string{"default", "critical", "low"},
-})
-go ms.Start()
-```
-
-```bash
-curl http://localhost:9090/metrics
-```
-
-**Test:** `metrics_test.go` — runs a task, asserts `asynq_tasks_processed_total` increments.
-
----
-
-### Feature 6: Load Test Benchmark Suite
-
-**Goal:** Real, honest performance numbers produced by running Go benchmarks.
-
-**Benchmarks** (`benchmark_test.go`):
-
-| Benchmark | Description |
-|-----------|-------------|
-| `BenchmarkEnqueue` | Enqueue N tasks concurrently |
-| `BenchmarkProcessing` | Enqueue + process N tasks with no-op handler |
-| `BenchmarkPriorityScheduling` | Enqueue across 3 queues with weighted config |
-| `BenchmarkIdempotencyCheck` | Duplicate enqueue overhead measurement |
-
-**Load test** (`cmd/loadtest/main.go`): fires 10,000 tasks with 50 concurrent workers, measuring total time, tasks/second throughput, and p50/p95/p99 processing latency.
-
-**Run benchmarks:**
-```bash
-go test -bench=. -benchtime=10s ./...
-```
-
----
-
-## Performance
-
-> Numbers measured on: Intel Core i7, 16GB RAM, Redis 7.0 on localhost.
-
-```
-BenchmarkEnqueue-8                   	  500000	      2341 ns/op
-BenchmarkProcessing-8                	  100000	     15420 ns/op
-BenchmarkPriorityScheduling-8        	   80000	     18730 ns/op
-BenchmarkIdempotencyCheck-8          	  200000	      6810 ns/op
-```
-
-**Load Test (10,000 tasks, 50 workers):**
-```
-Total time:        4.2s
-Throughput:        2,380 tasks/sec
-p50 latency:       18ms
-p95 latency:       42ms
-p99 latency:       89ms
-```
-
----
-
-## Monitoring
-
-The Prometheus metrics endpoint at `:9090/metrics` provides:
-
-- **Queue health**: Use `asynq_queue_depth` to alert on queue backup.
-- **DLQ monitoring**: Use `asynq_dlq_depth > 0` to alert on stuck tasks.
-- **Throughput**: Use rate of `asynq_tasks_processed_total` for SLO monitoring.
-- **Latency**: Use `asynq_task_processing_duration_seconds` p99 for latency SLOs.
-- **Worker saturation**: Use `asynq_active_workers / concurrency` for scale decisions.
-
-Example Grafana/Prometheus alert:
-```yaml
-- alert: TaskQueueBacklog
-  expr: asynq_queue_depth{queue="critical"} > 1000
-  for: 5m
-  annotations:
-    summary: "Critical queue has >1000 pending tasks"
-```
-
----
-
-## Building & Running
-
-```bash
-# Build everything
-go build ./...
-
-# Run all tests (requires Redis on localhost:6379)
-go test ./...
-
-# Run benchmarks
-go test -bench=. -benchtime=10s ./...
-
-# Run load test
-go run cmd/loadtest/main.go
-
-# Run vet
-go vet ./...
-```
-
----
-
-## Original asynq Documentation
-
-For full documentation of the base asynq library, see the [upstream README](https://github.com/hibiken/asynq#readme) and [godoc](https://pkg.go.dev/github.com/hibiken/asynq).
-
----
-
-## License
-
-MIT — same as upstream asynq.

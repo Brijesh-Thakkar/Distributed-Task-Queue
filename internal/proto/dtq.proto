@@ -3,11 +3,11 @@
 // that can be found in the LICENSE file.
 
 syntax = "proto3";
-package asynq;
+package dtq;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/hibiken/asynq/internal/proto";
+option go_package = "github.com/brijesh-thakkar/distributed-task-queue/internal/proto";
 
 // TaskMessage is the internal representation of a task with additional
 // metadata fields.

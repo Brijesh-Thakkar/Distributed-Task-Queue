@@ -1,6 +1,6 @@
 //go:build windows
 
-package asynq
+package dtq
 
 import (
 	"os"

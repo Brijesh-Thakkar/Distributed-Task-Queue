@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 )
 
 func TestTaskKey(t *testing.T) {

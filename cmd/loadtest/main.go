@@ -1,4 +1,4 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -64,7 +64,7 @@ func main() {
 
 	done := make(chan struct{})
 
-	handler := asynq.HandlerFunc(func(ctx context.Context, task *asynq.Task) error {
+	handler := dtq.HandlerFunc(func(ctx context.Context, task *dtq.Task) error {
 		taskStartMu.Lock()
 		start, ok := taskStart[task.Type()]
 		taskStartMu.Unlock()
@@ -84,13 +84,13 @@ func main() {
 		return nil
 	})
 
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: *redisAddr, DB: 15},
-		asynq.Config{
+	srv := dtq.NewServer(
+		dtq.RedisClientOpt{Addr: *redisAddr, DB: 15},
+		dtq.Config{
 			Concurrency:       *numWorkers,
 			Queues:            map[string]int{"loadtest": 1},
 			TaskCheckInterval: 10 * time.Millisecond,
-			LogLevel:          asynq.FatalLevel, // suppress server logs during load test
+			LogLevel:          dtq.FatalLevel, // suppress server logs during load test
 		},
 	)
 	if err := srv.Start(handler); err != nil {
@@ -99,7 +99,7 @@ func main() {
 	}
 	defer srv.Shutdown()
 
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: *redisAddr, DB: 15})
+	client := dtq.NewClient(dtq.RedisClientOpt{Addr: *redisAddr, DB: 15})
 	defer client.Close()
 
 	fmt.Printf("\n  Enqueueing %d tasks... ", *numTasks)
@@ -113,9 +113,9 @@ func main() {
 		taskStart[taskType] = now
 		taskStartMu.Unlock()
 
-		task := asynq.NewTask(taskType, []byte(`{}`),
-			asynq.Queue("loadtest"),
-			asynq.MaxRetry(0),
+		task := dtq.NewTask(taskType, []byte(`{}`),
+			dtq.Queue("loadtest"),
+			dtq.MaxRetry(0),
 		)
 		if _, err := client.Enqueue(task); err != nil {
 			failCount.Add(1)

@@ -1,33 +1,33 @@
-// Package metrics provides implementations of prometheus.Collector to collect Asynq queue metrics.
+// Package metrics provides implementations of prometheus.Collector to collect Dtq queue metrics.
 package metrics
 
 import (
 	"fmt"
 	"log"
 
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Namespace used in fully-qualified metrics names.
-const namespace = "asynq"
+const namespace = "dtq"
 
 // QueueMetricsCollector gathers queue metrics.
 // It implements prometheus.Collector interface.
 //
-// All metrics exported from this collector have prefix "asynq".
+// All metrics exported from this collector have prefix "dtq".
 type QueueMetricsCollector struct {
-	inspector *asynq.Inspector
+	inspector *client.Inspector
 }
 
 // collectQueueInfo gathers QueueInfo of all queues.
 // Since this operation is expensive, it must be called once per collection.
-func (qmc *QueueMetricsCollector) collectQueueInfo() ([]*asynq.QueueInfo, error) {
+func (qmc *QueueMetricsCollector) collectQueueInfo() ([]*client.QueueInfo, error) {
 	qnames, err := qmc.inspector.Queues()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get queue names: %w", err)
 	}
-	infos := make([]*asynq.QueueInfo, len(qnames))
+	infos := make([]*client.QueueInfo, len(qnames))
 	for i, qname := range qnames {
 		qinfo, err := qmc.inspector.GetQueueInfo(qname)
 		if err != nil {
@@ -184,7 +184,7 @@ func (qmc *QueueMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// NewQueueMetricsCollector returns a collector that exports metrics about Asynq queues.
-func NewQueueMetricsCollector(inspector *asynq.Inspector) *QueueMetricsCollector {
+// NewQueueMetricsCollector returns a collector that exports metrics about Dtq queues.
+func NewQueueMetricsCollector(inspector *client.Inspector) *QueueMetricsCollector {
 	return &QueueMetricsCollector{inspector: inspector}
 }

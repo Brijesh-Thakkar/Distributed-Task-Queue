@@ -13,19 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prepare CI for Go 1.24.x and 1.25.x (commit: e9037f0)
 
 ### Added
-- Add Headers support to tasks (PR: https://github.com/hibiken/asynq/pull/1070)
-- Add `--tls` option to dash command (PR: https://github.com/hibiken/asynq/pull/1073)
-- Add `--username` CLI flag for Redis ACL authentication (PR: https://github.com/hibiken/asynq/pull/1083)
-- Add `UpdateTaskPayload` method for inspector (PR: https://github.com/hibiken/asynq/pull/1042)
+- Add Headers support to tasks (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1070)
+- Add `--tls` option to dash command (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1073)
+- Add `--username` CLI flag for Redis ACL authentication (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1083)
+- Add `UpdateTaskPayload` method for inspector (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1042)
 
 ### Fixes
-- Fix: Correct error message text in ResultWriter.Write (PR: https://github.com/hibiken/asynq/pull/1054)
-- Fix: Wrap all fmt.Errorf errors with %w (PR: https://github.com/hibiken/asynq/pull/1047)
-- Fix: ServeMux.NotFoundHandler returns ErrHandlerNotFound error (PR: https://github.com/hibiken/asynq/pull/1031)
+- Fix: Correct error message text in ResultWriter.Write (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1054)
+- Fix: Wrap all fmt.Errorf errors with %w (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1047)
+- Fix: ServeMux.NotFoundHandler returns ErrHandlerNotFound error (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1031)
 
 ### Changed
-- Docs: Update server.go documentation (PR: https://github.com/hibiken/asynq/pull/1010)
-- Chore: Fix godoc comment (PR: https://github.com/hibiken/asynq/pull/1009)
+- Docs: Update server.go documentation (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1010)
+- Chore: Fix godoc comment (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/1009)
 
 ## [0.25.1] - 2024-12-11
 
@@ -35,41 +35,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Add `HeartbeatInterval` option to the scheduler (PR: https://github.com/hibiken/asynq/pull/956)
-* Add `RedisUniversalClient` support to periodic task manager (PR: https://github.com/hibiken/asynq/pull/958)
-* Add `--insecure` flag to CLI dash command (PR: https://github.com/hibiken/asynq/pull/980)
-* Add logging for registration errors (PR: https://github.com/hibiken/asynq/pull/657)
+* Add `HeartbeatInterval` option to the scheduler (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/956)
+* Add `RedisUniversalClient` support to periodic task manager (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/958)
+* Add `--insecure` flag to CLI dash command (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/980)
+* Add logging for registration errors (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/657)
 
 ### Fixes
-- Perf: Use string concat inplace of fmt.Sprintf in hotpath (PR: https://github.com/hibiken/asynq/pull/962)
-- Perf: Init map with size (PR: https://github.com/hibiken/asynq/pull/673)
-- Fix: `Scheduler` and `PeriodicTaskManager` graceful shutdown (PR: https://github.com/hibiken/asynq/pull/977)
-- Fix: `Server` graceful shutdown on UNIX systems (PR: https://github.com/hibiken/asynq/pull/982)
+- Perf: Use string concat inplace of fmt.Sprintf in hotpath (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/962)
+- Perf: Init map with size (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/673)
+- Fix: `Scheduler` and `PeriodicTaskManager` graceful shutdown (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/977)
+- Fix: `Server` graceful shutdown on UNIX systems (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/982)
 
 ## [0.25.0] - 2024-10-29
 
 ### Upgrades
-- Minumum go version is set to 1.22 (PR: https://github.com/hibiken/asynq/pull/925)
-- Internal protobuf package is upgraded to address security advisories (PR: https://github.com/hibiken/asynq/pull/925)
+- Minumum go version is set to 1.22 (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/925)
+- Internal protobuf package is upgraded to address security advisories (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/925)
 - Most packages are upgraded
 - CI/CD spec upgraded
 
 ### Added
-- `IsPanicError` function is introduced to support catching of panic errors when processing tasks (PR: https://github.com/hibiken/asynq/pull/491)
-- `JanitorInterval` and `JanitorBatchSize` are added as Server options (PR: https://github.com/hibiken/asynq/pull/715)
-- `NewClientFromRedisClient` is introduced to allow reusing an existing redis client (PR: https://github.com/hibiken/asynq/pull/742)
-- `TaskCheckInterval` config option is added to specify the interval between checks for new tasks to process when all queues are empty (PR: https://github.com/hibiken/asynq/pull/694)
-- `Ping` method is added to Client, Server and Scheduler ((PR: https://github.com/hibiken/asynq/pull/585))
-- `RevokeTask` error type is introduced to prevent a task from being retried or archived (PR: https://github.com/hibiken/asynq/pull/882)
-- `SentinelUsername` is added as a redis config option (PR: https://github.com/hibiken/asynq/pull/924)
-- Some jitter is introduced to improve latency when fetching jobs in the processor (PR: https://github.com/hibiken/asynq/pull/868)
-- Add task enqueue command to the CLI (PR: https://github.com/hibiken/asynq/pull/918)
-- Add a map cache (concurrent safe) to keep track of queues that ultimately reduces redis load when enqueuing tasks (PR: https://github.com/hibiken/asynq/pull/946)
+- `IsPanicError` function is introduced to support catching of panic errors when processing tasks (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/491)
+- `JanitorInterval` and `JanitorBatchSize` are added as Server options (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/715)
+- `NewClientFromRedisClient` is introduced to allow reusing an existing redis client (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/742)
+- `TaskCheckInterval` config option is added to specify the interval between checks for new tasks to process when all queues are empty (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/694)
+- `Ping` method is added to Client, Server and Scheduler ((PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/585))
+- `RevokeTask` error type is introduced to prevent a task from being retried or archived (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/882)
+- `SentinelUsername` is added as a redis config option (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/924)
+- Some jitter is introduced to improve latency when fetching jobs in the processor (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/868)
+- Add task enqueue command to the CLI (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/918)
+- Add a map cache (concurrent safe) to keep track of queues that ultimately reduces redis load when enqueuing tasks (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/946)
 
 ### Fixes
-- Archived tasks that are trimmed should now be deleted (PR: https://github.com/hibiken/asynq/pull/743)
-- Fix lua script when listing task messages with an expired lease (PR: https://github.com/hibiken/asynq/pull/709)
-- Fix potential context leaks due to cancellation not being called (PR: https://github.com/hibiken/asynq/pull/926)
+- Archived tasks that are trimmed should now be deleted (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/743)
+- Fix lua script when listing task messages with an expired lease (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/709)
+- Fix potential context leaks due to cancellation not being called (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/926)
 - Misc documentation fixes
 - Misc test fixes
 
@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.24.0] - 2023-01-02
 
 ### Added
-- `PreEnqueueFunc`, `PostEnqueueFunc` is added in `Scheduler` and deprecated `EnqueueErrorHandler` (PR: https://github.com/hibiken/asynq/pull/476)
+- `PreEnqueueFunc`, `PostEnqueueFunc` is added in `Scheduler` and deprecated `EnqueueErrorHandler` (PR: https://github.com/brijesh-thakkar/distributed-task-queue/pull/476)
 
 ### Changed
 - Removed error log when `Scheduler` failed to enqueue a task. Use `PostEnqueueFunc` to check for errors and task actions if needed.
@@ -103,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed overflow issue with 32-bit systems (For details, see https://github.com/hibiken/asynq/pull/426)
+- Fixed overflow issue with 32-bit systems (For details, see https://github.com/brijesh-thakkar/distributed-task-queue/pull/426)
 
 ## [0.22.1] - 2022-02-20
 
@@ -127,8 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `PeriodicTaskManager` is added. Prefer using this over `Scheduler` as it has better support for dynamic periodic tasks.
-- The `asynq stats` command now supports a `--json` option, making its output a JSON object
-- Introduced new configuration for `DelayedTaskCheckInterval`. See [godoc](https://godoc.org/github.com/hibiken/asynq) for more details.
+- The `dtq stats` command now supports a `--json` option, making its output a JSON object
+- Introduced new configuration for `DelayedTaskCheckInterval`. See [godoc](https://godoc.org/github.com/brijesh-thakkar/distributed-task-queue) for more details.
 
 ## [0.20.0] - 2021-12-19
 
@@ -201,7 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed latency issue around memory usage (see https://github.com/hibiken/asynq/issues/309).
+- Fixed latency issue around memory usage (see https://github.com/brijesh-thakkar/distributed-task-queue/issues/309).
 
 ## [0.18.1] - 2021-07-04
 
@@ -226,7 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Inspector.RunTaskByKey` is replaced with `Inspector.RunTask`
 - `Inspector.DeleteTaskByKey` is replaced with `Inspector.DeleteTask`
 - `Inspector.ArchiveTaskByKey` is replaced with `Inspector.ArchiveTask`
-- `inspeq` package is removed. All types and functions from the package is moved to `asynq` package.
+- `inspeq` package is removed. All types and functions from the package is moved to `dtq` package.
 - `WorkerInfo` field names have changed.
 - `Inspector.CancelActiveTask` is renamed to `Inspector.CancelProcessing`
 
@@ -234,7 +234,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Free unique lock when task is deleted (https://github.com/hibiken/asynq/issues/275).
+- Free unique lock when task is deleted (https://github.com/brijesh-thakkar/distributed-task-queue/issues/275).
 
 ## [0.17.1] - 2021-04-04
 
@@ -262,11 +262,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.15.0] - 2021-01-31
 
-**IMPORTATNT**: All `Inspector` related code are moved to subpackage "github.com/hibiken/asynq/inspeq"
+**IMPORTATNT**: All `Inspector` related code are moved to subpackage "github.com/brijesh-thakkar/distributed-task-queue/inspeq"
 
 ### Changed
 
-- `Inspector` related code are moved to subpackage "github.com/hibken/asynq/inspeq".
+- `Inspector` related code are moved to subpackage "github.com/hibken/dtq/inspeq".
 - `RedisConnOpt` interface has changed slightly. If you have been passing `RedisClientOpt`, `RedisFailoverClientOpt`, or `RedisClusterClientOpt` as a pointer,
   update your code to pass as a value.
 - `ErrorMsg` field in `RetryTask` and `ArchivedTask` was renamed to `LastError`.
@@ -277,7 +277,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MemoryUsage` field was added to `QueueStats`.
 - `DeleteAllPendingTasks`, `ArchiveAllPendingTasks` were added to `Inspector`
 - `DeleteTaskByKey` and `ArchiveTaskByKey` now supports deleting/archiving `PendingTask`.
-- asynq CLI now supports deleting/archiving pending tasks.
+- dtq CLI now supports deleting/archiving pending tasks.
 
 ## [0.14.1] - 2021-01-19
 
@@ -287,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.14.0] - 2021-01-14
 
-**IMPORTATNT**: Please run `asynq migrate` command to migrate from the previous versions.
+**IMPORTATNT**: Please run `dtq migrate` command to migrate from the previous versions.
 
 ### Changed
 
@@ -316,7 +316,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Scheduler` type is added to enable periodic tasks. See the godoc for its APIs and [wiki](https://github.com/hibiken/asynq/wiki/Periodic-Tasks) for the getting-started guide.
+- `Scheduler` type is added to enable periodic tasks. See the godoc for its APIs and [wiki](https://github.com/brijesh-thakkar/distributed-task-queue/wiki/Periodic-Tasks) for the getting-started guide.
 
 ### Changed
 
@@ -331,7 +331,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.12.0] - 2020-09-12
 
-**IMPORTANT**: If you are upgrading from a previous version, please install the latest version of the CLI `go get -u github.com/hibiken/asynq/tools/asynq` and run `asynq migrate` command. No process should be writing to Redis while you run the migration command.
+**IMPORTANT**: If you are upgrading from a previous version, please install the latest version of the CLI `go get -u github.com/brijesh-thakkar/distributed-task-queue/tools/dtq` and run `dtq migrate` command. No process should be writing to Redis while you run the migration command.
 
 ## The semantics of queue have changed
 
@@ -357,8 +357,8 @@ Use `ProcessIn` or `ProcessAt` option to schedule a task instead of `EnqueueIn` 
 
 | Previously                  | v0.12.0                                    |
 | --------------------------- | ------------------------------------------ |
-| `client.EnqueueAt(t, task)` | `client.Enqueue(task, asynq.ProcessAt(t))` |
-| `client.EnqueueIn(d, task)` | `client.Enqueue(task, asynq.ProcessIn(d))` |
+| `client.EnqueueAt(t, task)` | `client.Enqueue(task, dtq.ProcessAt(t))` |
+| `client.EnqueueIn(d, task)` | `client.Enqueue(task, dtq.ProcessIn(d))` |
 
 #### `Inspector`
 
@@ -370,12 +370,12 @@ Command "Enqueue" is replaced by the verb "Run" (e.g. `EnqueueAllScheduledTasks`
 #### `CLI`
 
 CLI commands are restructured to use subcommands. Commands are organized into a few management commands:
-To view details on any command, use `asynq help <command> <subcommand>`.
+To view details on any command, use `dtq help <command> <subcommand>`.
 
-- `asynq stats`
-- `asynq queue [ls inspect history rm pause unpause]`
-- `asynq task [ls cancel delete kill run delete-all kill-all run-all]`
-- `asynq server [ls]`
+- `dtq stats`
+- `dtq queue [ls inspect history rm pause unpause]`
+- `dtq task [ls cancel delete kill run delete-all kill-all run-all]`
+- `dtq server [ls]`
 
 ### Added
 
@@ -414,7 +414,7 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 - All tasks now requires timeout or deadline. By default, timeout is set to 30 mins.
 - Tasks that exceed its deadline are automatically retried.
 - Encoding schema for task message has changed. Please install the latest CLI and run `migrate` command if
-  you have tasks enqueued with the previous version of asynq.
+  you have tasks enqueued with the previous version of dtq.
 - API of `(*Client).Enqueue`, `(*Client).EnqueueIn`, and `(*Client).EnqueueAt` has changed to return a `*Result`.
 - API of `ErrorHandler` has changed. It now takes context as the first argument and removed `retried`, `maxRetry` from the argument list.
   Use `GetRetryCount` and/or `GetMaxRetry` to get the count values.
@@ -423,13 +423,13 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 ### Fixed
 
-- Fixes issue of same tasks processed by more than one worker (https://github.com/hibiken/asynq/issues/90).
+- Fixes issue of same tasks processed by more than one worker (https://github.com/brijesh-thakkar/distributed-task-queue/issues/90).
 
 ## [0.9.3] - 2020-06-12
 
 ### Fixed
 
-- Fixes the JSON number overflow issue (https://github.com/hibiken/asynq/issues/166).
+- Fixes the JSON number overflow issue (https://github.com/brijesh-thakkar/distributed-task-queue/issues/166).
 
 ## [0.9.2] - 2020-06-08
 
@@ -463,7 +463,7 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 ### Fixed
 
-- [Fixed cancelfunc leak](https://github.com/hibiken/asynq/pull/145)
+- [Fixed cancelfunc leak](https://github.com/brijesh-thakkar/distributed-task-queue/pull/145)
 
 ## [0.8.1] - 2020-04-27
 
@@ -478,8 +478,8 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 - `Background` type is renamed to `Server`.
 - To upgrade from the previous version, Update `NewBackground` to `NewServer` and pass `Config` by value.
-- CLI is renamed to `asynq`.
-- To upgrade the CLI to the latest version run `go get -u github.com/hibiken/tools/asynq`
+- CLI is renamed to `dtq`.
+- To upgrade the CLI to the latest version run `go get -u github.com/brijesh-thakkar/distributed-task-queue/tools/dtq`
 - The `ps` command in CLI is renamed to `servers`
 - `Concurrency` defaults to the number of CPUs when unset or set to a negative value.
 
@@ -514,7 +514,7 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 ### Added
 
-- `Client` can optionally schedule task with `asynq.Deadline(time)` to specify deadline for task's context. Default is no deadline.
+- `Client` can optionally schedule task with `dtq.Deadline(time)` to specify deadline for task's context. Default is no deadline.
 - `Logger` option was added to config, which allows user to specify the logger used by the background instance.
 
 ## [0.6.0] - 2020-03-01
@@ -532,25 +532,25 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 ### Added
 
-- `asynqmon workers` was added to list all running workers information
+- `dtqmon workers` was added to list all running workers information
 
 ## [0.4.0] - 2020-02-13
 
 ### Changed
 
-- `Handler` interface has changed. `ProcessTask` method takes two arguments `context.Context` and `*asynq.Task`
+- `Handler` interface has changed. `ProcessTask` method takes two arguments `context.Context` and `*core.Task`
 - `Queues` field in `Config` has change from `map[string]uint` to `map[string]int`
 
 ### Added
 
-- `Client` can optionally schedule task with `asynq.Timeout(duration)` to specify timeout duration for task. Default is no timeout.
-- `asynqmon cancel [task id]` will send a cancelation signal to the goroutine processing the speicified task.
+- `Client` can optionally schedule task with `dtq.Timeout(duration)` to specify timeout duration for task. Default is no timeout.
+- `dtqmon cancel [task id]` will send a cancelation signal to the goroutine processing the speicified task.
 
 ## [0.3.0] - 2020-02-04
 
 ### Added
 
-- `asynqmon ps` was added to list all background worker processes
+- `dtqmon ps` was added to list all background worker processes
 
 ## [0.2.2] - 2020-01-26
 
@@ -560,8 +560,8 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 ### Changed
 
-- `asynqmon ls` command is now paginated (default 30 tasks from first page)
-- `asynqmon ls enqueued:[queue name]` requires queue name to be specified
+- `dtqmon ls` command is now paginated (default 30 tasks from first page)
+- `dtqmon ls enqueued:[queue name]` requires queue name to be specified
 
 ## [0.2.1] - 2020-01-22
 
@@ -577,22 +577,22 @@ To view details on any command, use `asynq help <command> <subcommand>`.
 
 - NewTask constructor
 - `Queues` option in `Config` to specify mutiple queues with priority level
-- `Client` can schedule a task with `asynq.Queue(name)` to specify which queue to use
+- `Client` can schedule a task with `dtq.Queue(name)` to specify which queue to use
 - `StrictPriority` option in `Config` to specify whether the priority should be followed strictly
 - `RedisConnOpt` to abstract away redis client implementation
-- [CLI] `asynqmon rmq` command to remove queue
+- [CLI] `dtqmon rmq` command to remove queue
 
 ### Changed
 
 - `Client` and `Background` constructors take `RedisConnOpt` as their first argument.
-- `asynqmon stats` now shows the total of all enqueued tasks under "Enqueued"
-- `asynqmon stats` now shows each queue's task count
-- `asynqmon history` now doesn't take any arguments and shows data from the last 10 days by default (use `--days` flag to change the number of days)
+- `dtqmon stats` now shows the total of all enqueued tasks under "Enqueued"
+- `dtqmon stats` now shows each queue's task count
+- `dtqmon history` now doesn't take any arguments and shows data from the last 10 days by default (use `--days` flag to change the number of days)
 - Task type is now immutable (i.e., Payload is read-only)
 
 ## [0.1.0] - 2020-01-04
 
 ### Added
 
-- Initial version of asynq package
-- Initial version of asynqmon CLI
+- Initial version of dtq package
+- Initial version of dtqmon CLI

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"crypto/sha256"
@@ -119,13 +119,13 @@ func validatePeriodicTaskConfig(c *PeriodicTaskConfig) error {
 // Start returns any error encountered at start up time.
 func (mgr *PeriodicTaskManager) Start() error {
 	if mgr.s == nil || mgr.p == nil {
-		panic("asynq: cannot start uninitialized PeriodicTaskManager; use NewPeriodicTaskManager to initialize")
+		panic("dtq: cannot start uninitialized PeriodicTaskManager; use NewPeriodicTaskManager to initialize")
 	}
 	if err := mgr.initialSync(); err != nil {
-		return fmt.Errorf("asynq: %w", err)
+		return fmt.Errorf("dtq: %w", err)
 	}
 	if err := mgr.s.Start(); err != nil {
-		return fmt.Errorf("asynq: %w", err)
+		return fmt.Errorf("dtq: %w", err)
 	}
 	mgr.wg.Add(1)
 	go func() {

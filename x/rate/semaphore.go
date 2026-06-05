@@ -1,4 +1,4 @@
-// Package rate contains rate limiting strategies for asynq.Handler(s).
+// Package rate contains rate limiting strategies for worker.Handler(s).
 package rate
 
 import (
@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hibiken/asynq"
-	asynqcontext "github.com/hibiken/asynq/internal/context"
+	"github.com/brijesh-thakkar/distributed-task-queue"
+	dtqcontext "github.com/brijesh-thakkar/distributed-task-queue/internal/context"
 	"github.com/redis/go-redis/v9"
 )
 
 // NewSemaphore creates a counting Semaphore for the given scope with the given number of tokens.
-func NewSemaphore(rco asynq.RedisConnOpt, scope string, maxTokens int) *Semaphore {
+func NewSemaphore(rco client.RedisConnOpt, scope string, maxTokens int) *Semaphore {
 	rc, ok := rco.MakeRedisClient().(redis.UniversalClient)
 	if !ok {
 		panic(fmt.Sprintf("rate.NewSemaphore: unsupported RedisConnOpt type %T", rco))
@@ -34,7 +34,7 @@ func NewSemaphore(rco asynq.RedisConnOpt, scope string, maxTokens int) *Semaphor
 	}
 }
 
-// Semaphore is a distributed counting semaphore which can be used to set maxTokens across multiple asynq servers.
+// Semaphore is a distributed counting semaphore which can be used to set maxTokens across multiple dtq servers.
 type Semaphore struct {
 	rc        redis.UniversalClient
 	maxTokens int
@@ -71,7 +71,7 @@ func (s *Semaphore) Acquire(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("provided context must have a deadline")
 	}
 
-	taskID, ok := asynqcontext.GetTaskID(ctx)
+	taskID, ok := dtqcontext.GetTaskID(ctx)
 	if !ok {
 		return false, fmt.Errorf("provided context is missing task ID value")
 	}
@@ -87,7 +87,7 @@ func (s *Semaphore) Acquire(ctx context.Context) (bool, error) {
 
 // Release will release the token on the counting semaphore.
 func (s *Semaphore) Release(ctx context.Context) error {
-	taskID, ok := asynqcontext.GetTaskID(ctx)
+	taskID, ok := dtqcontext.GetTaskID(ctx)
 	if !ok {
 		return fmt.Errorf("provided context is missing task ID value")
 	}

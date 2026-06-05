@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/rdb"
-	"github.com/hibiken/asynq/internal/testbroker"
-	h "github.com/hibiken/asynq/internal/testutil"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/testbroker"
+	h "github.com/brijesh-thakkar/distributed-task-queue/internal/testutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 )
 
 // Test goes through a few phases.

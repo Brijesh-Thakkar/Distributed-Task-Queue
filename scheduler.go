@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"fmt"
@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/log"
-	"github.com/hibiken/asynq/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/log"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 )
@@ -55,7 +55,7 @@ func NewScheduler(r RedisConnOpt, opts *SchedulerOpts) *Scheduler {
 
 	redisClient, ok := r.MakeRedisClient().(redis.UniversalClient)
 	if !ok {
-		panic(fmt.Sprintf("asynq: unsupported RedisConnOpt type %T", r))
+		panic(fmt.Sprintf("dtq: unsupported RedisConnOpt type %T", r))
 	}
 
 	rdb := rdb.NewRDB(redisClient)
@@ -68,7 +68,7 @@ func NewScheduler(r RedisConnOpt, opts *SchedulerOpts) *Scheduler {
 
 // NewSchedulerFromRedisClient returns a new instance of Scheduler given a redis.UniversalClient
 // The parameter opts is optional, defaults will be used if opts is set to nil.
-// Warning: The underlying redis connection pool will not be closed by Asynq, you are responsible for closing it.
+// Warning: The underlying redis connection pool will not be closed by Dtq, you are responsible for closing it.
 func NewSchedulerFromRedisClient(c redis.UniversalClient, opts *SchedulerOpts) *Scheduler {
 	scheduler := newScheduler(opts)
 
@@ -236,7 +236,7 @@ func (s *Scheduler) Unregister(entryID string) error {
 	defer s.mu.Unlock()
 	cronID, ok := s.idmap[entryID]
 	if !ok {
-		return fmt.Errorf("asynq: no scheduler entry found")
+		return fmt.Errorf("dtq: no scheduler entry found")
 	}
 	delete(s.idmap, entryID)
 	s.cron.Remove(cronID)
@@ -275,9 +275,9 @@ func (s *Scheduler) start() error {
 	defer s.state.mu.Unlock()
 	switch s.state.value {
 	case srvStateActive:
-		return fmt.Errorf("asynq: the scheduler is already running")
+		return fmt.Errorf("dtq: the scheduler is already running")
 	case srvStateClosed:
-		return fmt.Errorf("asynq: the scheduler has already been stopped")
+		return fmt.Errorf("dtq: the scheduler has already been stopped")
 	}
 	s.state.value = srvStateActive
 	return nil

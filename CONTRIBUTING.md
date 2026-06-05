@@ -1,11 +1,11 @@
 # Contributing
 
-Thanks for your interest in contributing to Asynq!
+Thanks for your interest in contributing to Dtq!
 We are open to, and grateful for, any contributions made by the community.
 
 ## Reporting Bugs
 
-Have a look at our [issue tracker](https://github.com/hibiken/asynq/issues). If you can't find an issue (open or closed)
+Have a look at our [issue tracker](https://github.com/brijesh-thakkar/distributed-task-queue/issues). If you can't find an issue (open or closed)
 describing your problem (or a very similar one) there, please open a new issue with
 the following details:
 
@@ -19,17 +19,17 @@ the following details:
 ## Getting Help
 
 We run a [Gitter
-channel](https://gitter.im/go-asynq/community) where you can ask questions and
+channel](https://gitter.im/go-dtq/community) where you can ask questions and
 get help. Feel free to ask there before opening a GitHub issue.
 
 ## Submitting Feature Requests
 
 If you can't find an issue (open or closed) describing your idea on our [issue
-tracker](https://github.com/hibiken/asynq/issues), open an issue. Adding answers to the following
+tracker](https://github.com/brijesh-thakkar/distributed-task-queue/issues), open an issue. Adding answers to the following
 questions in your description is +1:
 
-- What do you want to do, and how do you expect Asynq to support you with that?
-- How might this be added to Asynq?
+- What do you want to do, and how do you expect Dtq to support you with that?
+- How might this be added to Dtq?
 - What are possible alternatives?
 - Are there any disadvantages?
 
@@ -38,7 +38,7 @@ Thank you! We'll try to respond as quickly as possible.
 ## Contributing Code
 
 1. Fork this repo
-2. Download your fork `git clone git@github.com:your-username/asynq.git && cd asynq`
+2. Download your fork `git clone git@github.com:your-username/dtq.git && cd dtq`
 3. Create your branch `git checkout -b your-branch-name`
 4. Make and commit your changes
 5. Push the branch `git push origin your-branch-name`

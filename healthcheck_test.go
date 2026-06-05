@@ -2,15 +2,15 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/hibiken/asynq/internal/rdb"
-	"github.com/hibiken/asynq/internal/testbroker"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/testbroker"
 )
 
 func TestHealthChecker(t *testing.T) {

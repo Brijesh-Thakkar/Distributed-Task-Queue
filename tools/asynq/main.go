@@ -4,7 +4,7 @@
 
 package main
 
-import "github.com/hibiken/asynq/tools/asynq/cmd"
+import "github.com/brijesh-thakkar/distributed-task-queue/tools/dtq/cmd"
 
 func main() {
 	cmd.Execute()

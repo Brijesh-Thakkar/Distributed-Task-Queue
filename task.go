@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -247,7 +247,7 @@ func (s TaskState) String() string {
 	case TaskStateAggregating:
 		return "aggregating"
 	}
-	panic("asynq: unknown task state")
+	panic("dtq: unknown task state")
 }
 
 // RedisConnOpt is a discriminated union of types that represent Redis connection configuration option.
@@ -475,7 +475,7 @@ func (opt RedisClusterClientOpt) MakeRedisClient() interface{} {
 func ParseRedisURI(uri string) (RedisConnOpt, error) {
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("asynq: could not parse redis uri: %w", err)
+		return nil, fmt.Errorf("dtq: could not parse redis uri: %w", err)
 	}
 	switch u.Scheme {
 	case "redis", "rediss":
@@ -485,7 +485,7 @@ func ParseRedisURI(uri string) (RedisConnOpt, error) {
 	case "redis-sentinel":
 		return parseRedisSentinelURI(u)
 	default:
-		return nil, fmt.Errorf("asynq: unsupported uri scheme: %q", u.Scheme)
+		return nil, fmt.Errorf("dtq: unsupported uri scheme: %q", u.Scheme)
 	}
 }
 
@@ -498,7 +498,7 @@ func parseRedisURI(u *url.URL) (RedisConnOpt, error) {
 		xs := strings.Split(strings.Trim(u.Path, "/"), "/")
 		db, err = strconv.Atoi(xs[0])
 		if err != nil {
-			return nil, fmt.Errorf("asynq: could not parse redis uri: database number should be the first segment of the path")
+			return nil, fmt.Errorf("dtq: could not parse redis uri: database number should be the first segment of the path")
 		}
 	}
 	var password string
@@ -522,7 +522,7 @@ func parseRedisURI(u *url.URL) (RedisConnOpt, error) {
 }
 
 func parseRedisSocketURI(u *url.URL) (RedisConnOpt, error) {
-	const errPrefix = "asynq: could not parse redis socket uri"
+	const errPrefix = "dtq: could not parse redis socket uri"
 	if len(u.Path) == 0 {
 		return nil, fmt.Errorf("%s: path does not exist", errPrefix)
 	}

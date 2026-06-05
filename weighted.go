@@ -1,8 +1,8 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package asynq — Weighted Round-Robin Priority Queue Scheduler.
+// Package dtq — Weighted Round-Robin Priority Queue Scheduler.
 //
 // WeightedQueues provides deterministic weighted round-robin scheduling across
 // multiple queues. Unlike the existing probabilistic approach (random shuffle),
@@ -11,7 +11,7 @@
 // For example, {"critical": 6, "default": 3, "low": 1} means the polling
 // order cycles through: critical×6, default×3, low×1 in a repeating 10-slot cycle.
 
-package asynq
+package dtq
 
 import (
 	"sort"

@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -189,18 +189,18 @@ func byteCount(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-var queueColumnConfigs = []*columnConfig[*asynq.QueueInfo]{
-	{"Queue", alignLeft, func(q *asynq.QueueInfo) string { return q.Queue }},
-	{"State", alignLeft, func(q *asynq.QueueInfo) string { return formatQueueState(q) }},
-	{"Size", alignRight, func(q *asynq.QueueInfo) string { return strconv.Itoa(q.Size) }},
-	{"Latency", alignRight, func(q *asynq.QueueInfo) string { return q.Latency.Round(time.Second).String() }},
-	{"MemoryUsage", alignRight, func(q *asynq.QueueInfo) string { return byteCount(q.MemoryUsage) }},
-	{"Processed", alignRight, func(q *asynq.QueueInfo) string { return strconv.Itoa(q.Processed) }},
-	{"Failed", alignRight, func(q *asynq.QueueInfo) string { return strconv.Itoa(q.Failed) }},
-	{"ErrorRate", alignRight, func(q *asynq.QueueInfo) string { return formatErrorRate(q.Processed, q.Failed) }},
+var queueColumnConfigs = []*columnConfig[*client.QueueInfo]{
+	{"Queue", alignLeft, func(q *client.QueueInfo) string { return q.Queue }},
+	{"State", alignLeft, func(q *client.QueueInfo) string { return formatQueueState(q) }},
+	{"Size", alignRight, func(q *client.QueueInfo) string { return strconv.Itoa(q.Size) }},
+	{"Latency", alignRight, func(q *client.QueueInfo) string { return q.Latency.Round(time.Second).String() }},
+	{"MemoryUsage", alignRight, func(q *client.QueueInfo) string { return byteCount(q.MemoryUsage) }},
+	{"Processed", alignRight, func(q *client.QueueInfo) string { return strconv.Itoa(q.Processed) }},
+	{"Failed", alignRight, func(q *client.QueueInfo) string { return strconv.Itoa(q.Failed) }},
+	{"ErrorRate", alignRight, func(q *client.QueueInfo) string { return formatErrorRate(q.Processed, q.Failed) }},
 }
 
-func formatQueueState(q *asynq.QueueInfo) string {
+func formatQueueState(q *client.QueueInfo) string {
 	if q.Paused {
 		return "PAUSED"
 	}
@@ -263,88 +263,88 @@ func taskPageSize(s tcell.Screen) int {
 }
 
 func shouldShowGroupTable(state *State) bool {
-	return state.taskState == asynq.TaskStateAggregating && state.selectedGroup == nil
+	return state.taskState == core.TaskStateAggregating && state.selectedGroup == nil
 }
 
-func getTaskTableColumnConfig(taskState asynq.TaskState) []*columnConfig[*asynq.TaskInfo] {
+func getTaskTableColumnConfig(taskState core.TaskState) []*columnConfig[*core.TaskInfo] {
 	switch taskState {
-	case asynq.TaskStateActive:
+	case core.TaskStateActive:
 		return activeTaskTableColumns
-	case asynq.TaskStatePending:
+	case core.TaskStatePending:
 		return pendingTaskTableColumns
-	case asynq.TaskStateAggregating:
+	case core.TaskStateAggregating:
 		return aggregatingTaskTableColumns
-	case asynq.TaskStateScheduled:
+	case core.TaskStateScheduled:
 		return scheduledTaskTableColumns
-	case asynq.TaskStateRetry:
+	case core.TaskStateRetry:
 		return retryTaskTableColumns
-	case asynq.TaskStateArchived:
+	case core.TaskStateArchived:
 		return archivedTaskTableColumns
-	case asynq.TaskStateCompleted:
+	case core.TaskStateCompleted:
 		return completedTaskTableColumns
 	}
 	panic("unknown task state")
 }
 
-var activeTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Retried", alignRight, func(t *asynq.TaskInfo) string { return strconv.Itoa(t.Retried) }},
-	{"Max Retry", alignRight, func(t *asynq.TaskInfo) string { return strconv.Itoa(t.MaxRetry) }},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
+var activeTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Retried", alignRight, func(t *core.TaskInfo) string { return strconv.Itoa(t.Retried) }},
+	{"Max Retry", alignRight, func(t *core.TaskInfo) string { return strconv.Itoa(t.MaxRetry) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
 }
 
-var pendingTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Retried", alignRight, func(t *asynq.TaskInfo) string { return strconv.Itoa(t.Retried) }},
-	{"Max Retry", alignRight, func(t *asynq.TaskInfo) string { return strconv.Itoa(t.MaxRetry) }},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
+var pendingTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Retried", alignRight, func(t *core.TaskInfo) string { return strconv.Itoa(t.Retried) }},
+	{"Max Retry", alignRight, func(t *core.TaskInfo) string { return strconv.Itoa(t.MaxRetry) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
 }
 
-var aggregatingTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
-	{"Group", alignLeft, func(t *asynq.TaskInfo) string { return t.Group }},
+var aggregatingTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
+	{"Group", alignLeft, func(t *core.TaskInfo) string { return t.Group }},
 }
 
-var scheduledTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Next Process Time", alignLeft, func(t *asynq.TaskInfo) string {
+var scheduledTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Next Process Time", alignLeft, func(t *core.TaskInfo) string {
 		return formatNextProcessTime(t.NextProcessAt)
 	}},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
 }
 
-var retryTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Retry", alignRight, func(t *asynq.TaskInfo) string { return fmt.Sprintf("%d/%d", t.Retried, t.MaxRetry) }},
-	{"Last Failure", alignLeft, func(t *asynq.TaskInfo) string { return t.LastErr }},
-	{"Last Failure Time", alignLeft, func(t *asynq.TaskInfo) string { return formatPastTime(t.LastFailedAt) }},
-	{"Next Process Time", alignLeft, func(t *asynq.TaskInfo) string {
+var retryTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Retry", alignRight, func(t *core.TaskInfo) string { return fmt.Sprintf("%d/%d", t.Retried, t.MaxRetry) }},
+	{"Last Failure", alignLeft, func(t *core.TaskInfo) string { return t.LastErr }},
+	{"Last Failure Time", alignLeft, func(t *core.TaskInfo) string { return formatPastTime(t.LastFailedAt) }},
+	{"Next Process Time", alignLeft, func(t *core.TaskInfo) string {
 		return formatNextProcessTime(t.NextProcessAt)
 	}},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
 }
 
-var archivedTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Retry", alignRight, func(t *asynq.TaskInfo) string { return fmt.Sprintf("%d/%d", t.Retried, t.MaxRetry) }},
-	{"Last Failure", alignLeft, func(t *asynq.TaskInfo) string { return t.LastErr }},
-	{"Last Failure Time", alignLeft, func(t *asynq.TaskInfo) string { return formatPastTime(t.LastFailedAt) }},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
+var archivedTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Retry", alignRight, func(t *core.TaskInfo) string { return fmt.Sprintf("%d/%d", t.Retried, t.MaxRetry) }},
+	{"Last Failure", alignLeft, func(t *core.TaskInfo) string { return t.LastErr }},
+	{"Last Failure Time", alignLeft, func(t *core.TaskInfo) string { return formatPastTime(t.LastFailedAt) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
 }
 
-var completedTaskTableColumns = []*columnConfig[*asynq.TaskInfo]{
-	{"ID", alignLeft, func(t *asynq.TaskInfo) string { return t.ID }},
-	{"Type", alignLeft, func(t *asynq.TaskInfo) string { return t.Type }},
-	{"Completion Time", alignLeft, func(t *asynq.TaskInfo) string { return formatPastTime(t.CompletedAt) }},
-	{"Payload", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Payload) }},
-	{"Result", alignLeft, func(t *asynq.TaskInfo) string { return formatByteSlice(t.Result) }},
+var completedTaskTableColumns = []*columnConfig[*core.TaskInfo]{
+	{"ID", alignLeft, func(t *core.TaskInfo) string { return t.ID }},
+	{"Type", alignLeft, func(t *core.TaskInfo) string { return t.Type }},
+	{"Completion Time", alignLeft, func(t *core.TaskInfo) string { return formatPastTime(t.CompletedAt) }},
+	{"Payload", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Payload) }},
+	{"Result", alignLeft, func(t *core.TaskInfo) string { return formatByteSlice(t.Result) }},
 }
 
 func drawTaskTable(d *ScreenDrawer, state *State) {
@@ -360,7 +360,7 @@ func drawTaskTable(d *ScreenDrawer, state *State) {
 	// Pagination
 	pageSize := taskPageSize(d.Screen())
 	totalCount := getTaskCount(state.selectedQueue, state.taskState)
-	if state.taskState == asynq.TaskStateAggregating {
+	if state.taskState == core.TaskStateAggregating {
 		// aggregating tasks are scoped to each group when shown in the table.
 		totalCount = state.selectedGroup.Size
 	}
@@ -390,9 +390,9 @@ func drawGroupTable(d *ScreenDrawer, state *State) {
 		return // print nothing
 	}
 	d.Println("<<< Select group >>>", baseStyle)
-	colConfigs := []*columnConfig[*asynq.GroupInfo]{
-		{"Name", alignLeft, func(g *asynq.GroupInfo) string { return g.Group }},
-		{"Size", alignRight, func(g *asynq.GroupInfo) string { return strconv.Itoa(g.Size) }},
+	colConfigs := []*columnConfig[*dtq.GroupInfo]{
+		{"Name", alignLeft, func(g *dtq.GroupInfo) string { return g.Group }},
+		{"Size", alignRight, func(g *dtq.GroupInfo) string { return strconv.Itoa(g.Size) }},
 	}
 	// pagination
 	pageSize := groupPageSize(d.Screen())
@@ -426,17 +426,17 @@ func min[V number](x, y V) V {
 }
 
 // Define the order of states to show
-var taskStates = []asynq.TaskState{
-	asynq.TaskStateActive,
-	asynq.TaskStatePending,
-	asynq.TaskStateAggregating,
-	asynq.TaskStateScheduled,
-	asynq.TaskStateRetry,
-	asynq.TaskStateArchived,
-	asynq.TaskStateCompleted,
+var taskStates = []core.TaskState{
+	core.TaskStateActive,
+	core.TaskStatePending,
+	core.TaskStateAggregating,
+	core.TaskStateScheduled,
+	core.TaskStateRetry,
+	core.TaskStateArchived,
+	core.TaskStateCompleted,
 }
 
-func nextTaskState(current asynq.TaskState) asynq.TaskState {
+func nextTaskState(current core.TaskState) core.TaskState {
 	for i, ts := range taskStates {
 		if current == ts {
 			if i == len(taskStates)-1 {
@@ -449,7 +449,7 @@ func nextTaskState(current asynq.TaskState) asynq.TaskState {
 	panic("unknown task state")
 }
 
-func prevTaskState(current asynq.TaskState) asynq.TaskState {
+func prevTaskState(current core.TaskState) core.TaskState {
 	for i, ts := range taskStates {
 		if current == ts {
 			if i == 0 {
@@ -462,21 +462,21 @@ func prevTaskState(current asynq.TaskState) asynq.TaskState {
 	panic("unknown task state")
 }
 
-func getTaskCount(queue *asynq.QueueInfo, taskState asynq.TaskState) int {
+func getTaskCount(queue *client.QueueInfo, taskState core.TaskState) int {
 	switch taskState {
-	case asynq.TaskStateActive:
+	case core.TaskStateActive:
 		return queue.Active
-	case asynq.TaskStatePending:
+	case core.TaskStatePending:
 		return queue.Pending
-	case asynq.TaskStateAggregating:
+	case core.TaskStateAggregating:
 		return queue.Aggregating
-	case asynq.TaskStateScheduled:
+	case core.TaskStateScheduled:
 		return queue.Scheduled
-	case asynq.TaskStateRetry:
+	case core.TaskStateRetry:
 		return queue.Retry
-	case asynq.TaskStateArchived:
+	case core.TaskStateArchived:
 		return queue.Archived
-	case asynq.TaskStateCompleted:
+	case core.TaskStateCompleted:
 		return queue.Completed
 	}
 	panic("unkonwn task state")

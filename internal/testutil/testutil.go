@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package testutil defines test helpers for asynq and its internal packages.
+// Package testutil defines test helpers for dtq and its internal packages.
 package testutil
 
 import (
@@ -16,8 +16,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 	"github.com/redis/go-redis/v9"
 )
 

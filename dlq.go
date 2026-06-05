@@ -1,14 +1,14 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package asynq — Dead Letter Queue (DLQ) implementation.
+// Package dtq — Dead Letter Queue (DLQ) implementation.
 //
 // After a task exceeds DLQThreshold retries, it is routed to a dedicated
 // DLQ Redis sorted set (asynq:{queue}:dlq) instead of the normal archive.
 // An HTTP handler enables inspection and requeue of DLQ tasks.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
 	"github.com/redis/go-redis/v9"
 )
 

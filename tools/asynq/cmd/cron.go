@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc/v2"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 	"github.com/spf13/cobra"
 )
 
@@ -28,8 +28,8 @@ var cronCmd = &cobra.Command{
 	Use:   "cron <command> [flags]",
 	Short: "Manage cron",
 	Example: heredoc.Doc(`
-		$ asynq cron ls
-		$ asynq cron history 7837f142-6337-4217-9276-8f27281b67d1`),
+		$ dtq cron ls
+		$ dtq cron history 7837f142-6337-4217-9276-8f27281b67d1`),
 }
 
 var cronListCmd = &cobra.Command{
@@ -45,10 +45,10 @@ var cronHistoryCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run:   cronHistory,
 	Example: heredoc.Doc(`
-		$ asynq cron history 7837f142-6337-4217-9276-8f27281b67d1
-		$ asynq cron history 7837f142-6337-4217-9276-8f27281b67d1 bf6a8594-cd03-4968-b36a-8572c5e160dd
-		$ asynq cron history 7837f142-6337-4217-9276-8f27281b67d1 --size=100
-		$ asynq cron history 7837f142-6337-4217-9276-8f27281b67d1 --page=2`),
+		$ dtq cron history 7837f142-6337-4217-9276-8f27281b67d1
+		$ dtq cron history 7837f142-6337-4217-9276-8f27281b67d1 bf6a8594-cd03-4968-b36a-8572c5e160dd
+		$ dtq cron history 7837f142-6337-4217-9276-8f27281b67d1 --size=100
+		$ dtq cron history 7837f142-6337-4217-9276-8f27281b67d1 --page=2`),
 }
 
 func cronList(cmd *cobra.Command, args []string) {
@@ -118,7 +118,7 @@ func cronHistory(cmd *cobra.Command, args []string) {
 		fmt.Printf("Entry: %s\n\n", entryID)
 
 		events, err := inspector.ListSchedulerEnqueueEvents(
-			entryID, asynq.PageSize(pageSize), asynq.Page(pageNum))
+			entryID, dtq.PageSize(pageSize), dtq.Page(pageNum))
 		if err != nil {
 			fmt.Printf("error: %v\n", err)
 			continue

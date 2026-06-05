@@ -1,8 +1,8 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
 )
 
 // TestDLQTaskRoutedAfterThreshold verifies that a task is routed to the DLQ

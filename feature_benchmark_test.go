@@ -1,8 +1,8 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package asynq — Comprehensive Benchmark Suite.
+// Package dtq — Comprehensive Benchmark Suite.
 //
 // Run with: go test -bench=. -benchtime=10s -run='^$' .
 //
@@ -15,7 +15,7 @@
 //   - BenchmarkDLQSendTask: overhead of routing a task to DLQ
 //   - BenchmarkVisibilityTracker: overhead of claim/release per task
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
 	"github.com/redis/go-redis/v9"
 )
 

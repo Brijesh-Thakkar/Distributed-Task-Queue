@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq_test
+package dtq_test
 
 import (
 	"context"
@@ -12,17 +12,17 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/hibiken/asynq"
+	dtq "github.com/brijesh-thakkar/distributed-task-queue"
 	"golang.org/x/sys/unix"
 )
 
 func ExampleServer_Run() {
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: ":6379"},
-		asynq.Config{Concurrency: 20},
+	srv := dtq.NewServer(
+		dtq.RedisClientOpt{Addr: ":6379"},
+		dtq.Config{Concurrency: 20},
 	)
 
-	h := asynq.NewServeMux()
+	h := dtq.NewServeMux()
 	// ... Register handlers
 
 	// Run blocks and waits for os signal to terminate the program.
@@ -32,12 +32,12 @@ func ExampleServer_Run() {
 }
 
 func ExampleServer_Shutdown() {
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: ":6379"},
-		asynq.Config{Concurrency: 20},
+	srv := dtq.NewServer(
+		dtq.RedisClientOpt{Addr: ":6379"},
+		dtq.Config{Concurrency: 20},
 	)
 
-	h := asynq.NewServeMux()
+	h := dtq.NewServeMux()
 	// ... Register handlers
 
 	if err := srv.Start(h); err != nil {
@@ -52,12 +52,12 @@ func ExampleServer_Shutdown() {
 }
 
 func ExampleServer_Stop() {
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: ":6379"},
-		asynq.Config{Concurrency: 20},
+	srv := dtq.NewServer(
+		dtq.RedisClientOpt{Addr: ":6379"},
+		dtq.Config{Concurrency: 20},
 	)
 
-	h := asynq.NewServeMux()
+	h := dtq.NewServeMux()
 	// ... Register handlers
 
 	if err := srv.Start(h); err != nil {
@@ -81,15 +81,15 @@ func ExampleServer_Stop() {
 }
 
 func ExampleScheduler() {
-	scheduler := asynq.NewScheduler(
-		asynq.RedisClientOpt{Addr: ":6379"},
-		&asynq.SchedulerOpts{Location: time.Local},
+	scheduler := dtq.NewScheduler(
+		dtq.RedisClientOpt{Addr: ":6379"},
+		&dtq.SchedulerOpts{Location: time.Local},
 	)
 
-	if _, err := scheduler.Register("* * * * *", asynq.NewTask("task1", nil)); err != nil {
+	if _, err := scheduler.Register("* * * * *", dtq.NewTask("task1", nil)); err != nil {
 		log.Fatal(err)
 	}
-	if _, err := scheduler.Register("@every 30s", asynq.NewTask("task2", nil)); err != nil {
+	if _, err := scheduler.Register("@every 30s", dtq.NewTask("task2", nil)); err != nil {
 		log.Fatal(err)
 	}
 
@@ -100,11 +100,11 @@ func ExampleScheduler() {
 }
 
 func ExampleParseRedisURI() {
-	rconn, err := asynq.ParseRedisURI("redis://localhost:6379/10")
+	rconn, err := dtq.ParseRedisURI("redis://localhost:6379/10")
 	if err != nil {
 		log.Fatal(err)
 	}
-	r, ok := rconn.(asynq.RedisClientOpt)
+	r, ok := rconn.(dtq.RedisClientOpt)
 	if !ok {
 		log.Fatal("unexpected type")
 	}
@@ -117,7 +117,7 @@ func ExampleParseRedisURI() {
 
 func ExampleResultWriter() {
 	// ResultWriter is only accessible in Handler.
-	h := func(ctx context.Context, task *asynq.Task) error {
+	h := func(ctx context.Context, task *dtq.Task) error {
 		// .. do task processing work
 
 		res := []byte("task result data")

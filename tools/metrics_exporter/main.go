@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/hibiken/asynq"
-	"github.com/hibiken/asynq/x/metrics"
+	"github.com/brijesh-thakkar/distributed-task-queue"
+	"github.com/brijesh-thakkar/distributed-task-queue/x/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -36,7 +36,7 @@ func main() {
 	// Using NewPedanticRegistry here to test the implementation of Collectors and Metrics.
 	reg := prometheus.NewPedanticRegistry()
 
-	inspector := asynq.NewInspector(asynq.RedisClientOpt{
+	inspector := client.NewInspector(client.RedisClientOpt{
 		Addr:     flagRedisAddr,
 		DB:       flagRedisDB,
 		Password: flagRedisPassword,

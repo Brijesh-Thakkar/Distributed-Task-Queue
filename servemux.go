@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type muxEntry struct {
 	pattern string
 }
 
-// MiddlewareFunc is a function which receives an asynq.Handler and returns another asynq.Handler.
+// MiddlewareFunc is a function which receives an worker.Handler and returns another worker.Handler.
 // Typically, the returned handler is a closure which does something with the context and task passed
 // to it, and then calls the handler passed as parameter to the MiddlewareFunc.
 type MiddlewareFunc func(Handler) Handler
@@ -103,13 +103,13 @@ func (mux *ServeMux) Handle(pattern string, handler Handler) {
 	defer mux.mu.Unlock()
 
 	if strings.TrimSpace(pattern) == "" {
-		panic("asynq: invalid pattern")
+		panic("dtq: invalid pattern")
 	}
 	if handler == nil {
-		panic("asynq: nil handler")
+		panic("dtq: nil handler")
 	}
 	if _, exist := mux.m[pattern]; exist {
-		panic("asynq: multiple registrations for " + pattern)
+		panic("dtq: multiple registrations for " + pattern)
 	}
 
 	if mux.m == nil {
@@ -138,7 +138,7 @@ func appendSorted(es []muxEntry, e muxEntry) []muxEntry {
 // HandleFunc registers the handler function for the given pattern.
 func (mux *ServeMux) HandleFunc(pattern string, handler func(context.Context, *Task) error) {
 	if handler == nil {
-		panic("asynq: nil handler")
+		panic("dtq: nil handler")
 	}
 	mux.Handle(pattern, HandlerFunc(handler))
 }

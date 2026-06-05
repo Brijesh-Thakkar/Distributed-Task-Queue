@@ -1,8 +1,8 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -103,11 +103,11 @@ func TestMetricsEndpointReturnsPrometheusFormat(t *testing.T) {
 
 	// Every family we registered must appear.
 	want := []string{
-		"asynq_tasks_processed_total",
-		"asynq_task_duration_seconds",
-		"asynq_active_workers",
-		"asynq_queue_depth",
-		"asynq_dlq_depth",
+		"dtq_tasks_processed_total",
+		"dtq_task_duration_seconds",
+		"dtq_active_workers",
+		"dtq_queue_depth",
+		"dtq_dlq_depth",
 	}
 	for _, name := range want {
 		if !strings.Contains(bodyStr, name) {

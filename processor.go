@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
-	asynqcontext "github.com/hibiken/asynq/internal/context"
-	"github.com/hibiken/asynq/internal/errors"
-	"github.com/hibiken/asynq/internal/log"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	dtqcontext "github.com/brijesh-thakkar/distributed-task-queue/internal/context"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/errors"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/log"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 )
@@ -255,7 +255,7 @@ func (p *processor) exec() {
 				defer p.visibilityTracker.Release(msg.ID)
 			}
 
-			ctx, cancel := asynqcontext.New(p.baseCtxFn(), msg, deadline)
+			ctx, cancel := dtqcontext.New(p.baseCtxFn(), msg, deadline)
 			p.cancelations.Add(msg.ID, cancel)
 			defer func() {
 				cancel()

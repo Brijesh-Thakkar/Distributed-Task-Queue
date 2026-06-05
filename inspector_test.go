@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/rdb"
-	h "github.com/hibiken/asynq/internal/testutil"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
+	h "github.com/brijesh-thakkar/distributed-task-queue/internal/testutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -965,7 +965,7 @@ func TestInspectorListRetryTasks(t *testing.T) {
 			qname: "default",
 			want:  []*TaskInfo(nil),
 		},
-		// TODO(hibiken): ErrQueueNotFound when queue doesn't exist
+		// TODO(brijesh-thakkar): ErrQueueNotFound when queue doesn't exist
 	}
 
 	for _, tc := range tests {

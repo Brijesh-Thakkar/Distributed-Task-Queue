@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/errors"
-	"github.com/hibiken/asynq/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/errors"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -34,7 +34,7 @@ type Client struct {
 func NewClient(r RedisConnOpt) *Client {
 	redisClient, ok := r.MakeRedisClient().(redis.UniversalClient)
 	if !ok {
-		panic(fmt.Sprintf("asynq: unsupported RedisConnOpt type %T", r))
+		panic(fmt.Sprintf("dtq: unsupported RedisConnOpt type %T", r))
 	}
 	client := NewClientFromRedisClient(redisClient)
 	client.sharedConnection = false
@@ -42,7 +42,7 @@ func NewClient(r RedisConnOpt) *Client {
 }
 
 // NewClientFromRedisClient returns a new instance of Client given a redis.UniversalClient
-// Warning: The underlying redis connection pool will not be closed by Asynq, you are responsible for closing it.
+// Warning: The underlying redis connection pool will not be closed by Dtq, you are responsible for closing it.
 func NewClientFromRedisClient(c redis.UniversalClient) *Client {
 	return &Client{broker: rdb.NewRDB(c), sharedConnection: true}
 }
@@ -350,7 +350,7 @@ var (
 // Close closes the connection with redis.
 func (c *Client) Close() error {
 	if c.sharedConnection {
-		return fmt.Errorf("redis connection is shared so the Client can't be closed through asynq")
+		return fmt.Errorf("redis connection is shared so the Client can't be closed through dtq")
 	}
 	return c.broker.Close()
 }

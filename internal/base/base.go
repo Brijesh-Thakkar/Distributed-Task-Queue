@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package base defines foundational types and constants used in asynq package.
+// Package base defines foundational types and constants used in dtq package.
 package base
 
 import (
@@ -14,15 +14,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hibiken/asynq/internal/errors"
-	pb "github.com/hibiken/asynq/internal/proto"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/errors"
+	pb "github.com/brijesh-thakkar/distributed-task-queue/internal/proto"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Version of asynq library and CLI.
+// Version of dtq library and CLI.
 const Version = "0.26.0"
 
 // DefaultQueueName is the queue name used if none are specified by user.
@@ -328,8 +328,8 @@ func EncodeMessage(msg *TaskMessage) ([]byte, error) {
 			}
 			headers = h2
 		}
-		headers["__asynq_idempotency_key"] = msg.IdempotencyKey
-		headers["__asynq_idempotency_ttl"] = fmt.Sprintf("%d", msg.IdempotencyTTL)
+		headers["__dtq_idempotency_key"] = msg.IdempotencyKey
+		headers["__dtq_idempotency_ttl"] = fmt.Sprintf("%d", msg.IdempotencyTTL)
 	}
 	return proto.Marshal(&pb.TaskMessage{
 		Type:         msg.Type,
@@ -360,15 +360,15 @@ func DecodeMessage(data []byte) (*TaskMessage, error) {
 	// Extract idempotency metadata from headers, removing the reserved keys.
 	var idempotencyKey string
 	var idempotencyTTL int64
-	if iKey, ok := headers["__asynq_idempotency_key"]; ok {
+	if iKey, ok := headers["__dtq_idempotency_key"]; ok {
 		idempotencyKey = iKey
-		if iTTLStr, ok2 := headers["__asynq_idempotency_ttl"]; ok2 {
+		if iTTLStr, ok2 := headers["__dtq_idempotency_ttl"]; ok2 {
 			fmt.Sscanf(iTTLStr, "%d", &idempotencyTTL)
 		}
 		// Clone headers without the internal keys so the handler doesn't see them.
 		h2 := make(map[string]string, len(headers))
 		for k, v := range headers {
-			if k != "__asynq_idempotency_key" && k != "__asynq_idempotency_ttl" {
+			if k != "__dtq_idempotency_key" && k != "__dtq_idempotency_ttl" {
 				h2[k] = v
 			}
 		}

@@ -1,15 +1,15 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package asynq — Visibility Timeout implementation.
+// Package dtq — Visibility Timeout implementation.
 //
 // When a worker picks up a task, it sets a Redis key "asynq:visibility:{task_id}"
 // with a TTL (default 30s). The worker renews this key every 10 seconds (heartbeat).
 // The recoverer periodically scans for active tasks whose visibility key has
 // expired and routes them back to the pending queue for reprocessing.
 
-package asynq
+package dtq
 
 import (
 	"context"

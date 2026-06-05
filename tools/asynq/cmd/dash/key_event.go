@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 )
 
 // keyEventHandler handles keyboard events and updates the state.
@@ -181,7 +181,7 @@ func (h *keyEventHandler) enterKeyQueues() {
 	if state.queueTableRowIdx != 0 {
 		state.selectedQueue = state.queues[state.queueTableRowIdx-1]
 		state.view = viewTypeQueueDetails
-		state.taskState = asynq.TaskStateActive
+		state.taskState = core.TaskStateActive
 		state.tasks = nil
 		state.pageNum = 1
 		f.Fetch(state)

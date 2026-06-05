@@ -1,10 +1,12 @@
-module github.com/hibiken/asynq/x
+module github.com/brijesh-thakkar/distributed-task-queue/x
 
 go 1.22
 
+replace github.com/brijesh-thakkar/distributed-task-queue => ../
+
 require (
 	github.com/google/uuid v1.6.0
-	github.com/hibiken/asynq v0.25.0
+	github.com/brijesh-thakkar/distributed-task-queue v0.25.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0
 )

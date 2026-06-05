@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 )
 
 // viewType is an enum for dashboard views.
@@ -26,21 +26,21 @@ const (
 
 // State holds dashboard state.
 type State struct {
-	queues []*asynq.QueueInfo
-	tasks  []*asynq.TaskInfo
-	groups []*asynq.GroupInfo
+	queues []*client.QueueInfo
+	tasks  []*core.TaskInfo
+	groups []*dtq.GroupInfo
 	err    error
 
 	// Note: index zero corresponds to the table header; index=1 correctponds to the first element
 	queueTableRowIdx int             // highlighted row in queue table
 	taskTableRowIdx  int             // highlighted row in task table
 	groupTableRowIdx int             // highlighted row in group table
-	taskState        asynq.TaskState // highlighted task state in queue details view
+	taskState        core.TaskState // highlighted task state in queue details view
 	taskID           string          // selected task ID
 
-	selectedQueue *asynq.QueueInfo // queue shown on queue details view
-	selectedGroup *asynq.GroupInfo
-	selectedTask  *asynq.TaskInfo
+	selectedQueue *client.QueueInfo // queue shown on queue details view
+	selectedGroup *dtq.GroupInfo
+	selectedTask  *core.TaskInfo
 
 	pageNum int // pagination page number
 
@@ -91,7 +91,7 @@ func (s *State) DebugString() string {
 type Options struct {
 	DebugMode    bool
 	PollInterval time.Duration
-	RedisConnOpt asynq.RedisConnOpt
+	RedisConnOpt client.RedisConnOpt
 }
 
 func Run(opts Options) {
@@ -109,7 +109,7 @@ func Run(opts Options) {
 	var (
 		state = State{} // confined in this goroutine only; DO NOT SHARE
 
-		inspector = asynq.NewInspector(opts.RedisConnOpt)
+		inspector = client.NewInspector(opts.RedisConnOpt)
 		ticker    = time.NewTicker(opts.PollInterval)
 
 		eventCh = make(chan tcell.Event)
@@ -117,11 +117,11 @@ func Run(opts Options) {
 
 		// channels to send/receive data fetched asynchronously
 		errorCh  = make(chan error)
-		queueCh  = make(chan *asynq.QueueInfo)
-		taskCh   = make(chan *asynq.TaskInfo)
-		queuesCh = make(chan []*asynq.QueueInfo)
-		groupsCh = make(chan []*asynq.GroupInfo)
-		tasksCh  = make(chan []*asynq.TaskInfo)
+		queueCh  = make(chan *client.QueueInfo)
+		taskCh   = make(chan *core.TaskInfo)
+		queuesCh = make(chan []*client.QueueInfo)
+		groupsCh = make(chan []*dtq.GroupInfo)
+		tasksCh  = make(chan []*core.TaskInfo)
 	)
 	defer ticker.Stop()
 
@@ -208,7 +208,7 @@ func Run(opts Options) {
 			d.Draw(&state)
 
 		case err := <-errorCh:
-			if errors.Is(err, asynq.ErrTaskNotFound) {
+			if errors.Is(err, dtq.ErrTaskNotFound) {
 				state.selectedTask = nil
 			} else {
 				state.err = err

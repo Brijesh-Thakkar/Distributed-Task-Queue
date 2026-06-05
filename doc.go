@@ -3,12 +3,12 @@
 // that can be found in the LICENSE file.
 
 /*
-Package asynq provides a framework for Redis based distrubted task queue.
+Package dtq provides a framework for Redis based distrubted task queue.
 
-Asynq uses Redis as a message broker. To connect to redis,
+Dtq uses Redis as a message broker. To connect to redis,
 specify the connection using one of RedisConnOpt types.
 
-	redisConnOpt = asynq.RedisClientOpt{
+	redisConnOpt = client.RedisClientOpt{
 	    Addr:     "127.0.0.1:6379",
 	    Password: "xxxxx",
 	    DB:       2,
@@ -16,7 +16,7 @@ specify the connection using one of RedisConnOpt types.
 
 The Client is used to enqueue a task.
 
-	client := asynq.NewClient(redisConnOpt)
+	client := dtq.NewClient(redisConnOpt)
 
 	// Task is created with two parameters: its type and payload.
 	// Payload data is simply an array of bytes. It can be encoded in JSON, Protocol Buffer, Gob, etc.
@@ -25,18 +25,18 @@ The Client is used to enqueue a task.
 	    log.Fatal(err)
 	}
 
-	task := asynq.NewTask("example", b)
+	task := dtq.NewTask("example", b)
 
 	// Enqueue the task to be processed immediately.
 	info, err := client.Enqueue(task)
 
 	// Schedule the task to be processed after one minute.
-	info, err = client.Enqueue(t, asynq.ProcessIn(1*time.Minute))
+	info, err = client.Enqueue(t, dtq.ProcessIn(1*time.Minute))
 
 The Server is used to run the task processing workers with a given
 handler.
 
-	srv := asynq.NewServer(redisConnOpt, asynq.Config{
+	srv := dtq.NewServer(redisConnOpt, dtq.Config{
 	    Concurrency: 10,
 	})
 
@@ -55,7 +55,7 @@ Example of a type that implements the Handler interface.
 	    // ...
 	}
 
-	func (h *TaskHandler) ProcessTask(ctx context.Context, task *asynq.Task) error {
+	func (h *TaskHandler) ProcessTask(ctx context.Context, task *core.Task) error {
 	    switch task.Type {
 	    case "example":
 	        var data ExamplePayload
@@ -70,4 +70,4 @@ Example of a type that implements the Handler interface.
 	    return nil
 	}
 */
-package asynq
+package dtq

@@ -18,9 +18,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/fatih/color"
-	"github.com/hibiken/asynq"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -48,25 +48,25 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:     "asynq <command> <subcommand> [flags]",
-	Short:   "Asynq CLI",
-	Long:    `Command line tool to inspect tasks and queues managed by Asynq`,
+	Use:     "dtq <command> <subcommand> [flags]",
+	Short:   "Dtq CLI",
+	Long:    `Command line tool to inspect tasks and queues managed by Dtq`,
 	Version: base.Version,
 
 	SilenceUsage:  true,
 	SilenceErrors: true,
 
 	Example: heredoc.Doc(`
-		$ asynq stats
-		$ asynq queue pause myqueue
-		$ asynq task list --queue=myqueue --state=archived`),
+		$ dtq stats
+		$ dtq queue pause myqueue
+		$ dtq task list --queue=myqueue --state=archived`),
 	Annotations: map[string]string{
 		"help:feedback": heredoc.Doc(`
-			Open an issue at https://github.com/hibiken/asynq/issues/new/choose`),
+			Open an issue at https://github.com/brijesh-thakkar/distributed-task-queue/issues/new/choose`),
 	},
 }
 
-var versionOutput = fmt.Sprintf("asynq version %s\n", base.Version)
+var versionOutput = fmt.Sprintf("dtq version %s\n", base.Version)
 
 var versionCmd = &cobra.Command{
 	Use:    "version",
@@ -124,7 +124,7 @@ func capitalize(s string) string {
 }
 
 func rootHelpFunc(cmd *cobra.Command, args []string) {
-	// Display helpful error message when user mistypes a subcommand (e.g. 'asynq queue lst').
+	// Display helpful error message when user mistypes a subcommand (e.g. 'dtq queue lst').
 	if isRootCmd(cmd.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
 		printSubcommandSuggestions(cmd, args[1])
 		return
@@ -180,7 +180,7 @@ func rootHelpFunc(cmd *cobra.Command, args []string) {
 		helpEntries = append(helpEntries, &helpEntry{"EXAMPLES", cmd.Example})
 	}
 	helpEntries = append(helpEntries, &helpEntry{"LEARN MORE", heredoc.Doc(`
-		Use 'asynq <command> <subcommand> --help' for more information about a command.`)})
+		Use 'dtq <command> <subcommand> --help' for more information about a command.`)})
 	if s, ok := cmd.Annotations["help:feedback"]; ok {
 		helpEntries = append(helpEntries, &helpEntry{"FEEDBACK", s})
 	}
@@ -307,7 +307,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.SetVersionTemplate(versionOutput)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file to set flag defaut values (default is $HOME/.asynq.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file to set flag defaut values (default is $HOME/.dtq.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&uri, "uri", "u", "127.0.0.1:6379", "Redis server URI")
 	rootCmd.PersistentFlags().IntVarP(&db, "db", "n", 0, "Redis database number (default is 0)")
 	rootCmd.PersistentFlags().StringVarP(&password, "password", "p", "", "Password to use when connecting to redis server")
@@ -346,9 +346,9 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".asynq" (without extension).
+		// Search config in home directory with name ".dtq" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigName(".asynq")
+		viper.SetConfigName(".dtq")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -383,26 +383,26 @@ func createRDB() *rdb.RDB {
 }
 
 // createClient creates a Client instance using flag values and returns it.
-func createClient() *asynq.Client {
-	return asynq.NewClient(getRedisConnOpt())
+func createClient() *dtq.Client {
+	return dtq.NewClient(getRedisConnOpt())
 }
 
 // createInspector creates a Inspector instance using flag values and returns it.
-func createInspector() *asynq.Inspector {
-	return asynq.NewInspector(getRedisConnOpt())
+func createInspector() *client.Inspector {
+	return client.NewInspector(getRedisConnOpt())
 }
 
-func getRedisConnOpt() asynq.RedisConnOpt {
+func getRedisConnOpt() client.RedisConnOpt {
 	if viper.GetBool("cluster") {
 		addrs := strings.Split(viper.GetString("cluster_addrs"), ",")
-		return asynq.RedisClusterClientOpt{
+		return client.RedisClusterClientOpt{
 			Addrs:     addrs,
 			Password:  viper.GetString("password"),
 			Username:  viper.GetString("username"),
 			TLSConfig: getTLSConfig(),
 		}
 	}
-	return asynq.RedisClientOpt{
+	return client.RedisClientOpt{
 		Addr:      viper.GetString("uri"),
 		DB:        viper.GetInt("db"),
 		Password:  viper.GetString("password"),

@@ -10,7 +10,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/google/go-cmp/cmp"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 )
 
 func makeKeyEventHandler(t *testing.T, state *State) *keyEventHandler {
@@ -46,7 +46,7 @@ func TestKeyEventHandler(t *testing.T) {
 			desc: "navigates to queue details view",
 			state: &State{
 				view: viewTypeQueues,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 100, Active: 10, Pending: 40, Scheduled: 40, Completed: 10},
 				},
 				queueTableRowIdx: 0,
@@ -57,12 +57,12 @@ func TestKeyEventHandler(t *testing.T) {
 			},
 			wantState: State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 100, Active: 10, Pending: 40, Scheduled: 40, Completed: 10},
 				},
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 100, Active: 10, Pending: 40, Scheduled: 40, Completed: 10},
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 100, Active: 10, Pending: 40, Scheduled: 40, Completed: 10},
 				queueTableRowIdx: 1,
-				taskState:        asynq.TaskStateActive,
+				taskState:        core.TaskStateActive,
 				pageNum:          1,
 			},
 		},
@@ -70,7 +70,7 @@ func TestKeyEventHandler(t *testing.T) {
 			desc: "does nothing if no queues are present",
 			state: &State{
 				view:             viewTypeQueues,
-				queues:           []*asynq.QueueInfo{}, // empty
+				queues:           []*client.QueueInfo{}, // empty
 				queueTableRowIdx: 0,
 			},
 			events: []*tcell.EventKey{
@@ -79,7 +79,7 @@ func TestKeyEventHandler(t *testing.T) {
 			},
 			wantState: State{
 				view:             viewTypeQueues,
-				queues:           []*asynq.QueueInfo{},
+				queues:           []*client.QueueInfo{},
 				queueTableRowIdx: 0,
 			},
 		},
@@ -87,14 +87,14 @@ func TestKeyEventHandler(t *testing.T) {
 			desc: "opens task info modal",
 			state: &State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},
@@ -106,14 +106,14 @@ func TestKeyEventHandler(t *testing.T) {
 			},
 			wantState: State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},
@@ -121,21 +121,21 @@ func TestKeyEventHandler(t *testing.T) {
 				taskTableRowIdx: 2,
 				// new states
 				taskID:       "yyyy",
-				selectedTask: &asynq.TaskInfo{ID: "yyyy", Type: "bar"},
+				selectedTask: &core.TaskInfo{ID: "yyyy", Type: "bar"},
 			},
 		},
 		{
 			desc: "Esc closes task info modal",
 			state: &State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},
@@ -148,14 +148,14 @@ func TestKeyEventHandler(t *testing.T) {
 			},
 			wantState: State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},
@@ -168,14 +168,14 @@ func TestKeyEventHandler(t *testing.T) {
 			desc: "Arrow keys are disabled while task info modal is open",
 			state: &State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},
@@ -190,14 +190,14 @@ func TestKeyEventHandler(t *testing.T) {
 			// no change
 			wantState: State{
 				view: viewTypeQueueDetails,
-				queues: []*asynq.QueueInfo{
+				queues: []*client.QueueInfo{
 					{Queue: "default", Size: 500, Active: 10, Pending: 40},
 				},
 				queueTableRowIdx: 1,
-				selectedQueue:    &asynq.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
-				taskState:        asynq.TaskStatePending,
+				selectedQueue:    &client.QueueInfo{Queue: "default", Size: 50, Active: 10, Pending: 40},
+				taskState:        core.TaskStatePending,
 				pageNum:          1,
-				tasks: []*asynq.TaskInfo{
+				tasks: []*core.TaskInfo{
 					{ID: "xxxx", Type: "foo"},
 					{ID: "yyyy", Type: "bar"},
 					{ID: "zzzz", Type: "baz"},

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	h "github.com/hibiken/asynq/internal/testutil"
+	h "github.com/brijesh-thakkar/distributed-task-queue/internal/testutil"
 )
 
 // Creates a new task of type "task<n>" with payload {"data": n}.

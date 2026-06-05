@@ -1,22 +1,22 @@
-// Copyright 2024 asynq authors. All rights reserved.
+// Copyright 2024 dtq authors. All rights reserved.
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-// Package asynq — Prometheus Metrics Server.
+// Package dtq — Prometheus Metrics Server.
 //
 // MetricsServer exposes real-time queue health metrics at the /metrics endpoint.
 //
 // Metrics exposed:
-//   - asynq_queue_depth{queue}           Gauge     — pending tasks count
-//   - asynq_active_tasks{queue}          Gauge     — currently processing tasks
-//   - asynq_retry_tasks{queue}           Gauge     — tasks in retry state
-//   - asynq_archived_tasks{queue}        Gauge     — tasks in archive
-//   - asynq_dlq_depth{queue}             Gauge     — tasks in Dead Letter Queue
-//   - asynq_tasks_processed_total{queue,status} Counter — cumulative tasks processed
-//   - asynq_task_duration_seconds{queue} Histogram — processing latency
-//   - asynq_active_workers               Gauge     — actively processing workers
+//   - dtq_queue_depth{queue}           Gauge     — pending tasks count
+//   - dtq_active_tasks{queue}          Gauge     — currently processing tasks
+//   - dtq_retry_tasks{queue}           Gauge     — tasks in retry state
+//   - dtq_archived_tasks{queue}        Gauge     — tasks in archive
+//   - dtq_dlq_depth{queue}             Gauge     — tasks in Dead Letter Queue
+//   - dtq_tasks_processed_total{queue,status} Counter — cumulative tasks processed
+//   - dtq_task_duration_seconds{queue} Histogram — processing latency
+//   - dtq_active_workers               Gauge     — actively processing workers
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	// MetricsNamespace is the Prometheus namespace for all asynq metrics.
-	MetricsNamespace = "asynq"
+	// MetricsNamespace is the Prometheus namespace for all dtq metrics.
+	MetricsNamespace = "dtq"
 )
 
 // MetricsConfig configures the MetricsServer.
@@ -51,19 +51,19 @@ type MetricsConfig struct {
 	CollectInterval time.Duration
 }
 
-// MetricsServer exposes Prometheus metrics for asynq queue health.
-// Start it in a goroutine alongside your asynq.Server:
+// MetricsServer exposes Prometheus metrics for dtq queue health.
+// Start it in a goroutine alongside your dtq.Server:
 //
-//	ms := asynq.NewMetricsServer(asynq.MetricsConfig{...})
+//	ms := dtq.NewMetricsServer(dtq.MetricsConfig{...})
 //	go ms.Start()
 type MetricsServer struct {
 	cfg     MetricsConfig
 	reg     *prometheus.Registry
 	server  *http.Server
-	metrics *asynqMetrics
+	metrics *dtqMetrics
 }
 
-type asynqMetrics struct {
+type dtqMetrics struct {
 	queueDepth     *prometheus.GaugeVec
 	activeTasks    *prometheus.GaugeVec
 	retryTasks     *prometheus.GaugeVec
@@ -84,7 +84,7 @@ func NewMetricsServer(cfg MetricsConfig) *MetricsServer {
 	}
 
 	reg := prometheus.NewRegistry()
-	m := &asynqMetrics{
+	m := &dtqMetrics{
 		queueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: MetricsNamespace,
 			Name:      "queue_depth",

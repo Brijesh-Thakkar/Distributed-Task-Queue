@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hibiken/asynq"
-	"github.com/hibiken/asynq/internal/base"
-	asynqcontext "github.com/hibiken/asynq/internal/context"
+	"github.com/brijesh-thakkar/distributed-task-queue"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	dtqcontext "github.com/brijesh-thakkar/distributed-task-queue/internal/context"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -36,7 +36,7 @@ func TestNewSemaphore(t *testing.T) {
 		name           string
 		maxConcurrency int
 		wantPanic      string
-		connOpt        asynq.RedisConnOpt
+		connOpt        client.RedisConnOpt
 	}{
 		{
 			desc:      "Bad RedisConnOpt",
@@ -91,7 +91,7 @@ func TestNewSemaphore_Acquire(t *testing.T) {
 			maxConcurrency: 3,
 			taskIDs:        []string{uuid.NewString(), uuid.NewString()},
 			ctxFunc: func(id string) (context.Context, context.CancelFunc) {
-				return asynqcontext.New(context.Background(), &base.TaskMessage{
+				return dtqcontext.New(context.Background(), &base.TaskMessage{
 					ID:    id,
 					Queue: "task-1",
 				}, time.Now().Add(time.Second))
@@ -104,7 +104,7 @@ func TestNewSemaphore_Acquire(t *testing.T) {
 			maxConcurrency: 3,
 			taskIDs:        []string{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()},
 			ctxFunc: func(id string) (context.Context, context.CancelFunc) {
-				return asynqcontext.New(context.Background(), &base.TaskMessage{
+				return dtqcontext.New(context.Background(), &base.TaskMessage{
 					ID:    id,
 					Queue: "task-2",
 				}, time.Now().Add(time.Second))
@@ -219,7 +219,7 @@ func TestNewSemaphore_Acquire_StaleToken(t *testing.T) {
 	sema := NewSemaphore(opt, "stale-token", 1)
 	defer sema.Close()
 
-	ctx, cancel := asynqcontext.New(context.Background(), &base.TaskMessage{
+	ctx, cancel := dtqcontext.New(context.Background(), &base.TaskMessage{
 		ID:    taskID,
 		Queue: "task-1",
 	}, time.Now().Add(time.Second))
@@ -248,7 +248,7 @@ func TestNewSemaphore_Release(t *testing.T) {
 			name:    "task-5",
 			taskIDs: []string{uuid.NewString()},
 			ctxFunc: func(id string) (context.Context, context.CancelFunc) {
-				return asynqcontext.New(context.Background(), &base.TaskMessage{
+				return dtqcontext.New(context.Background(), &base.TaskMessage{
 					ID:    id,
 					Queue: "task-3",
 				}, time.Now().Add(time.Second))
@@ -259,7 +259,7 @@ func TestNewSemaphore_Release(t *testing.T) {
 			name:    "task-6",
 			taskIDs: []string{uuid.NewString(), uuid.NewString()},
 			ctxFunc: func(id string) (context.Context, context.CancelFunc) {
-				return asynqcontext.New(context.Background(), &base.TaskMessage{
+				return dtqcontext.New(context.Background(), &base.TaskMessage{
 					ID:    id,
 					Queue: "task-4",
 				}, time.Now().Add(time.Second))
@@ -337,7 +337,7 @@ func TestNewSemaphore_Release_Error(t *testing.T) {
 			name:    "task-8",
 			taskIDs: []string{uuid.NewString()},
 			ctxFunc: func(_ string) (context.Context, context.CancelFunc) {
-				return asynqcontext.New(context.Background(), &base.TaskMessage{
+				return dtqcontext.New(context.Background(), &base.TaskMessage{
 					ID:    testID,
 					Queue: "task-4",
 				}, time.Now().Add(time.Second))
@@ -383,18 +383,18 @@ func TestNewSemaphore_Release_Error(t *testing.T) {
 	}
 }
 
-func getRedisConnOpt(tb testing.TB) asynq.RedisConnOpt {
+func getRedisConnOpt(tb testing.TB) client.RedisConnOpt {
 	tb.Helper()
 	if useRedisCluster {
 		addrs := strings.Split(redisClusterAddrs, ",")
 		if len(addrs) == 0 {
 			tb.Fatal("No redis cluster addresses provided. Please set addresses using --redis_cluster_addrs flag.")
 		}
-		return asynq.RedisClusterClientOpt{
+		return client.RedisClusterClientOpt{
 			Addrs: addrs,
 		}
 	}
-	return asynq.RedisClientOpt{
+	return client.RedisClientOpt{
 		Addr: redisAddr,
 		DB:   redisDB,
 	}

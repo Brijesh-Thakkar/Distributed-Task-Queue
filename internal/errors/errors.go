@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // Package errors defines the error type and functions used by
-// asynq and its internal packages.
+// dtq and its internal packages.
 package errors
 
 // Note: This package is inspired by a blog post about error handling in project Upspin

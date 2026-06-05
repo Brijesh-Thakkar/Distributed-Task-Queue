@@ -12,7 +12,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/fatih/color"
-	"github.com/hibiken/asynq"
+	"github.com/brijesh-thakkar/distributed-task-queue"
 	"github.com/spf13/cobra"
 )
 
@@ -97,10 +97,10 @@ var taskCmd = &cobra.Command{
 	Use:   "task <command> [flags]",
 	Short: "Manage tasks",
 	Example: heredoc.Doc(`
-		$ asynq task list --queue=myqueue --state=scheduled
-		$ asynq task inspect --queue=myqueue --id=7837f142-6337-4217-9276-8f27281b67d1
-		$ asynq task delete --queue=myqueue --id=7837f142-6337-4217-9276-8f27281b67d1
-		$ asynq task deleteall --queue=myqueue --state=archived`),
+		$ dtq task list --queue=myqueue --state=scheduled
+		$ dtq task inspect --queue=myqueue --id=7837f142-6337-4217-9276-8f27281b67d1
+		$ dtq task delete --queue=myqueue --id=7837f142-6337-4217-9276-8f27281b67d1
+		$ dtq task deleteall --queue=myqueue --state=archived`),
 }
 
 var taskListCmd = &cobra.Command{
@@ -117,9 +117,9 @@ var taskListCmd = &cobra.Command{
 	List opeartion paginates the result set. By default, the command fetches the first 30 tasks.
 	Use --page and --size flags to specify the page number and size.`),
 	Example: heredoc.Doc(`
-		$ asynq task list --queue=myqueue --state=pending
-		$ asynq task list --queue=myqueue --state=aggregating --group=mygroup
-		$ asynq task list --queue=myqueue --state=scheduled --page=2`),
+		$ dtq task list --queue=myqueue --state=pending
+		$ dtq task list --queue=myqueue --state=aggregating --group=mygroup
+		$ dtq task list --queue=myqueue --state=scheduled --page=2`),
 	Run: taskList,
 }
 
@@ -129,7 +129,7 @@ var taskInspectCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskInspect,
 	Example: heredoc.Doc(`
-		$ asynq task inspect --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
+		$ dtq task inspect --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
 }
 
 var taskCancelCmd = &cobra.Command{
@@ -138,7 +138,7 @@ var taskCancelCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run:   taskCancel,
 	Example: heredoc.Doc(`
-		$ asynq task cancel f1720682-f5a6-4db1-8953-4f48ae541d0f`),
+		$ dtq task cancel f1720682-f5a6-4db1-8953-4f48ae541d0f`),
 }
 
 var taskArchiveCmd = &cobra.Command{
@@ -147,7 +147,7 @@ var taskArchiveCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskArchive,
 	Example: heredoc.Doc(`
-		$ asynq task archive --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
+		$ dtq task archive --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
 }
 
 var taskDeleteCmd = &cobra.Command{
@@ -157,7 +157,7 @@ var taskDeleteCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run:     taskDelete,
 	Example: heredoc.Doc(`
-		$ asynq task delete --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
+		$ dtq task delete --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
 }
 
 var taskRunCmd = &cobra.Command{
@@ -166,7 +166,7 @@ var taskRunCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskRun,
 	Example: heredoc.Doc(`
-		$ asynq task run --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
+		$ dtq task run --queue=myqueue --id=f1720682-f5a6-4db1-8953-4f48ae541d0f`),
 }
 
 var taskEnqueueCmd = &cobra.Command{
@@ -175,8 +175,8 @@ var taskEnqueueCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskEnqueue,
 	Example: heredoc.Doc(`
-		$ asynq task enqueue -t footype -l barpayload
-		$ asynq task enqueue -t footask -l barpayload --retry 3 --id f1720682-f5a6-4db1-8953-4f48ae541d0f --queue bazqueue --timeout 100s --deadline 2024-12-14T01:23:45Z --unique 100s --process_at 2024-12-14T01:22:05Z --process_in 100s --retention 5h --group baygroup`),
+		$ dtq task enqueue -t footype -l barpayload
+		$ dtq task enqueue -t footask -l barpayload --retry 3 --id f1720682-f5a6-4db1-8953-4f48ae541d0f --queue bazqueue --timeout 100s --deadline 2024-12-14T01:23:45Z --unique 100s --process_at 2024-12-14T01:22:05Z --process_in 100s --retention 5h --group baygroup`),
 }
 
 var taskArchiveAllCmd = &cobra.Command{
@@ -185,8 +185,8 @@ var taskArchiveAllCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskArchiveAll,
 	Example: heredoc.Doc(`
-		$ asynq task archiveall --queue=myqueue --state=retry
-		$ asynq task archiveall --queue=myqueue --state=aggregating --group=mygroup`),
+		$ dtq task archiveall --queue=myqueue --state=retry
+		$ dtq task archiveall --queue=myqueue --state=aggregating --group=mygroup`),
 }
 
 var taskDeleteAllCmd = &cobra.Command{
@@ -195,8 +195,8 @@ var taskDeleteAllCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskDeleteAll,
 	Example: heredoc.Doc(`
-		$ asynq task deleteall --queue=myqueue --state=archived
-		$ asynq task deleteall --queue=myqueue --state=aggregating --group=mygroup`),
+		$ dtq task deleteall --queue=myqueue --state=archived
+		$ dtq task deleteall --queue=myqueue --state=aggregating --group=mygroup`),
 }
 
 var taskRunAllCmd = &cobra.Command{
@@ -205,8 +205,8 @@ var taskRunAllCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run:   taskRunAll,
 	Example: heredoc.Doc(`
-		$ asynq task runall --queue=myqueue --state=retry
-		$ asynq task runall --queue=myqueue --state=aggregating --group=mygroup`),
+		$ dtq task runall --queue=myqueue --state=retry
+		$ dtq task runall --queue=myqueue --state=aggregating --group=mygroup`),
 }
 
 func taskList(cmd *cobra.Command, args []string) {
@@ -263,7 +263,7 @@ func taskList(cmd *cobra.Command, args []string) {
 
 func listActiveTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListActiveTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListActiveTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -284,7 +284,7 @@ func listActiveTasks(qname string, pageNum, pageSize int) {
 
 func listPendingTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListPendingTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListPendingTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -305,7 +305,7 @@ func listPendingTasks(qname string, pageNum, pageSize int) {
 
 func listScheduledTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListScheduledTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListScheduledTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -337,7 +337,7 @@ func formatProcessAt(processAt time.Time) string {
 
 func listRetryTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListRetryTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListRetryTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -359,7 +359,7 @@ func listRetryTasks(qname string, pageNum, pageSize int) {
 
 func listArchivedTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListArchivedTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListArchivedTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -379,7 +379,7 @@ func listArchivedTasks(qname string, pageNum, pageSize int) {
 
 func listCompletedTasks(qname string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListCompletedTasks(qname, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListCompletedTasks(qname, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -399,7 +399,7 @@ func listCompletedTasks(qname string, pageNum, pageSize int) {
 
 func listAggregatingTasks(qname, group string, pageNum, pageSize int) {
 	i := createInspector()
-	tasks, err := i.ListAggregatingTasks(qname, group, asynq.PageSize(pageSize), asynq.Page(pageNum))
+	tasks, err := i.ListAggregatingTasks(qname, group, dtq.PageSize(pageSize), dtq.Page(pageNum))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -450,7 +450,7 @@ func taskInspect(cmd *cobra.Command, args []string) {
 	printTaskInfo(info)
 }
 
-func printTaskInfo(info *asynq.TaskInfo) {
+func printTaskInfo(info *core.TaskInfo) {
 	bold := color.New(color.Bold)
 	bold.Println("Task Info")
 	fmt.Printf("Queue:   %s\n", info.Queue)
@@ -565,14 +565,14 @@ func taskEnqueue(cmd *cobra.Command, args []string) {
 	// For all of the optional flags, we need to explicitly check whether they were set or
 	// not; for consistency we want to use the defaults set in composeOptions() rather than
 	// the ones in the flag definitions.
-	opts := []asynq.Option{}
+	opts := []dtq.Option{}
 	if cmd.Flags().Changed("retry") {
 		retry, err := cmd.Flags().GetInt("retry")
 		if err != nil {
 			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
-		opts = append(opts, asynq.MaxRetry(retry))
+		opts = append(opts, dtq.MaxRetry(retry))
 	}
 
 	if cmd.Flags().Changed("queue") {
@@ -581,7 +581,7 @@ func taskEnqueue(cmd *cobra.Command, args []string) {
 			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
-		opts = append(opts, asynq.Queue(queue))
+		opts = append(opts, dtq.Queue(queue))
 	}
 
 	if cmd.Flags().Changed("id") {
@@ -590,31 +590,31 @@ func taskEnqueue(cmd *cobra.Command, args []string) {
 			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
-		opts = append(opts, asynq.TaskID(id))
+		opts = append(opts, core.TaskID(id))
 	}
 
 	if cmd.Flags().Changed("timeout") {
-		opts = append(opts, asynq.Timeout(getDuration(cmd, "timeout")))
+		opts = append(opts, dtq.Timeout(getDuration(cmd, "timeout")))
 	}
 
 	if cmd.Flags().Changed("deadline") {
-		opts = append(opts, asynq.Deadline(getTime(cmd, "deadline")))
+		opts = append(opts, dtq.Deadline(getTime(cmd, "deadline")))
 	}
 
 	if cmd.Flags().Changed("unique") {
-		opts = append(opts, asynq.Unique(getDuration(cmd, "unique")))
+		opts = append(opts, dtq.Unique(getDuration(cmd, "unique")))
 	}
 
 	if cmd.Flags().Changed("process_at") {
-		opts = append(opts, asynq.ProcessAt(getTime(cmd, "process_at")))
+		opts = append(opts, dtq.ProcessAt(getTime(cmd, "process_at")))
 	}
 
 	if cmd.Flags().Changed("process_in") {
-		opts = append(opts, asynq.ProcessIn(getDuration(cmd, "process_in")))
+		opts = append(opts, dtq.ProcessIn(getDuration(cmd, "process_in")))
 	}
 
 	if cmd.Flags().Changed("retention") {
-		opts = append(opts, asynq.Retention(getDuration(cmd, "retention")))
+		opts = append(opts, dtq.Retention(getDuration(cmd, "retention")))
 	}
 
 	if cmd.Flags().Changed("group") {
@@ -623,11 +623,11 @@ func taskEnqueue(cmd *cobra.Command, args []string) {
 			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
-		opts = append(opts, asynq.Group(group))
+		opts = append(opts, dtq.Group(group))
 	}
 
 	c := createClient()
-	task := asynq.NewTask(typeName, []byte(payload), opts...)
+	task := dtq.NewTask(typeName, []byte(payload), opts...)
 
 	taskInfo, err := c.Enqueue(task)
 	if err != nil {

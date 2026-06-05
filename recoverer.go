@@ -2,16 +2,16 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
 	"sync"
 	"time"
 
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/errors"
-	"github.com/hibiken/asynq/internal/log"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/errors"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/log"
 )
 
 type recoverer struct {
@@ -79,7 +79,7 @@ func (r *recoverer) start(wg *sync.WaitGroup) {
 
 // ErrLeaseExpired error indicates that the task failed because the worker working on the task
 // could not extend its lease due to missing heartbeats. The worker may have crashed or got cutoff from the network.
-var ErrLeaseExpired = errors.New("asynq: task lease expired")
+var ErrLeaseExpired = errors.New("dtq: task lease expired")
 
 func (r *recoverer) recover() {
 	r.recoverLeaseExpiredTasks()

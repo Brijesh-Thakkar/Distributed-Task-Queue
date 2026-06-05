@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -16,12 +16,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hibiken/asynq/internal/base"
-	"github.com/hibiken/asynq/internal/errors"
-	"github.com/hibiken/asynq/internal/log"
-	"github.com/hibiken/asynq/internal/rdb"
-	h "github.com/hibiken/asynq/internal/testutil"
-	"github.com/hibiken/asynq/internal/timeutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/base"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/errors"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/log"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
+	h "github.com/brijesh-thakkar/distributed-task-queue/internal/testutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/timeutil"
 )
 
 var taskCmpOpts = []cmp.Option{
@@ -225,7 +225,7 @@ func TestProcessorSuccessWithMultipleQueues(t *testing.T) {
 	}
 }
 
-// https://github.com/hibiken/asynq/issues/166
+// https://github.com/brijesh-thakkar/distributed-task-queue/issues/166
 func TestProcessTasksWithLargeNumberInPayload(t *testing.T) {
 	r := setup(t)
 	defer r.Close()

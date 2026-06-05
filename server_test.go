@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT license
 // that can be found in the LICENSE file.
 
-package asynq
+package dtq
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hibiken/asynq/internal/rdb"
-	"github.com/hibiken/asynq/internal/testbroker"
-	"github.com/hibiken/asynq/internal/testutil"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/rdb"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/testbroker"
+	"github.com/brijesh-thakkar/distributed-task-queue/internal/testutil"
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/goleak"
